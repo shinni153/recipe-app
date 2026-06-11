@@ -26,7 +26,6 @@ const RECIPE_PROMPT = `이 유튜브 영상을 분석해서 나오는 모든 레
 - 기본 베이스(도우, 육수, 소스 등)가 별도로 만들어지면 반드시 독립적인 레시피로 추출해줘.
 - 기본 베이스를 활용한 요리들도 각각 독립적인 레시피로 추출해줘.
 - 재료 분량은 반드시 전체 기준으로 표시해줘. 절대로 1/N로 나누지 마.
-  예: 도우를 6개로 소분한다면, 도우 레시피 재료는 전체 분량(6개 기준)으로 표시
 - 각 요리 레시피에는 베이스 재료도 포함시켜서 처음부터 끝까지 만들 수 있는 완전한 레시피로 만들어줘.
 
 반드시 JSON 배열 형식으로만 반환해줘. 다른 텍스트 없이 JSON만 반환해야 해.
@@ -71,13 +70,11 @@ async function analyzeVideoWithGemini(youtubeUrl) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: RECIPE_PROMPT },
-          { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
-        ]
-      }],
-      generationConfig: { temperature: 0.3 }
+      contents: [{ parts: [
+        { text: RECIPE_PROMPT },
+        { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
+      ]}],
+      generationConfig: { temperature: 0 }
     })
   });
   if (!res.ok) {
@@ -99,10 +96,8 @@ async function analyzeTranscriptWithGemini(transcript) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{
-        parts: [{ text: `${RECIPE_PROMPT}\n\n자막:\n${transcript.slice(0, 8000)}` }]
-      }],
-      generationConfig: { temperature: 0.3 }
+      contents: [{ parts: [{ text: `${RECIPE_PROMPT}\n\n자막:\n${transcript.slice(0, 8000)}` }] }],
+      generationConfig: { temperature: 0 }
     })
   });
   if (!res.ok) {
@@ -124,7 +119,6 @@ app.post("/api/extract", async (req, res) => {
   const videoId = url.match(/(?:v=|youtu\.be\/|shorts\/)([^&?/]+)/)?.[1];
   if (!videoId) return res.status(400).json({ error: "유효한 유튜브 URL이 아니에요." });
 
-  // 방법 1: Gemini 영상 직접 분석
   try {
     console.log("🎬 Gemini 영상 직접 분석 시도");
     const recipes = await analyzeVideoWithGemini(url);
@@ -134,7 +128,6 @@ app.post("/api/extract", async (req, res) => {
     console.log("❌ Gemini 영상 분석 실패:", e.message);
   }
 
-  // 방법 2: Supadata 자막 + Gemini 분석
   try {
     console.log("📝 Supadata 자막 추출 시도");
     const transcript = await getTranscriptSupadata(videoId);
@@ -148,9 +141,9 @@ app.post("/api/extract", async (req, res) => {
   }
 });
 
-// 레시피 저장
+// 레시피 저장 (user_id 포함)
 app.post("/api/save-recipe", async (req, res) => {
-  const { recipe, category, source_url } = req.body;
+  const { recipe, category, source_url, user_id } = req.body;
   if (!recipe) return res.status(400).json({ error: "레시피가 없어요." });
   try {
     const { data, error } = await supabase.from("recipes").insert([{
@@ -162,7 +155,8 @@ app.post("/api/save-recipe", async (req, res) => {
       ingredients: recipe.ingredients,
       steps: recipe.steps,
       nutrition: recipe.nutrition,
-      source_url: source_url || ""
+      source_url: source_url || "",
+      user_id: user_id || ""
     }]).select();
     if (error) throw error;
     console.log("✅ 레시피 저장 성공:", recipe.title);
@@ -173,12 +167,13 @@ app.post("/api/save-recipe", async (req, res) => {
   }
 });
 
-// 레시피 목록 조회
+// 레시피 목록 조회 (user_id 필터)
 app.get("/api/recipes", async (req, res) => {
-  const { category } = req.query;
+  const { category, user_id } = req.query;
   try {
     let query = supabase.from("recipes").select("*").order("created_at", { ascending: false });
     if (category && category !== "전체") query = query.eq("category", category);
+    if (user_id) query = query.eq("user_id", user_id);
     const { data, error } = await query;
     if (error) throw error;
     res.json({ recipes: data });
@@ -210,13 +205,11 @@ app.post("/api/recipe-from-image", async (req, res) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: imagePrompt },
-            { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } }
-          ]
-        }],
-        generationConfig: { temperature: 0.3 }
+        contents: [{ parts: [
+          { text: imagePrompt },
+          { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } }
+        ]}],
+        generationConfig: { temperature: 0 }
       })
     });
     const data = await res2.json();
