@@ -377,15 +377,36 @@
     renderRecipe(allRecipes[idx]);
   }
 
-  function renderRecipe(r) {
+  function renderRecipe(r, editable = false) {
     document.getElementById("result").innerHTML = `
       <div class="recipe-card">
-        <div class="recipe-title">${r.title || ""}</div>
-        <div class="recipe-desc">${r.description || ""}</div>
-        <div class="meta-grid">
-          <div class="meta-item"><div class="meta-label">조리 시간</div><div class="meta-value">${r.time || "-"}</div></div>
-          <div class="meta-item"><div class="meta-label">인분</div><div class="meta-value">${r.servings || "-"}</div></div>
-        </div>
+        ${editable ? `
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;color:#888">요리명</label>
+            <input type="text" id="edit-title" value="${r.title||""}" style="width:100%;margin-top:4px">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;color:#888">한줄 설명</label>
+            <input type="text" id="edit-desc" value="${r.description||""}" style="width:100%;margin-top:4px">
+          </div>
+          <div class="meta-grid" style="margin-bottom:12px">
+            <div>
+              <label style="font-size:12px;color:#888">조리 시간</label>
+              <input type="text" id="edit-time" value="${r.time||""}" style="width:100%;margin-top:4px">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#888">인분</label>
+              <input type="text" id="edit-servings" value="${r.servings||""}" style="width:100%;margin-top:4px">
+            </div>
+          </div>
+        ` : `
+          <div class="recipe-title">${r.title||""}</div>
+          <div class="recipe-desc">${r.description||""}</div>
+          <div class="meta-grid">
+            <div class="meta-item"><div class="meta-label">조리 시간</div><div class="meta-value">${r.time||"-"}</div></div>
+            <div class="meta-item"><div class="meta-label">인분</div><div class="meta-value">${r.servings||"-"}</div></div>
+          </div>
+        `}
         ${r.nutrition ? `
         <p class="section-title">예상 영양 정보 (참고용)</p>
         <div class="nutrition-grid">
@@ -396,14 +417,40 @@
         </div>` : ""}
         <div class="divider"></div>
         <p class="section-title">재료</p>
-        <div style="margin-bottom:20px">${(r.ingredients||[]).map(i=>`
-          <div class="ingredient-row"><span>${i.name}</span><span class="ingredient-amount">${i.amount}</span></div>
-        `).join("")}</div>
+        <div style="margin-bottom:20px" id="ingredients-list">
+          ${(r.ingredients||[]).map((ing, i) => editable ? `
+            <div class="ingredient-row">
+              <input type="text" value="${ing.name}" id="ing-name-${i}" style="width:55%;padding:6px 8px">
+              <input type="text" value="${ing.amount}" id="ing-amount-${i}" style="width:35%;padding:6px 8px">
+              <button onclick="removeIngredient(${i})" style="background:#fdecea;color:#c62828;border:none;border-radius:6px;padding:4px 8px;cursor:pointer">✕</button>
+            </div>
+          ` : `
+            <div class="ingredient-row"><span>${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>
+          `).join("")}
+        </div>
+        ${editable ? `<button onclick="addIngredient()" style="width:100%;padding:8px;background:#f0f7ff;color:#1a73e8;border:1.5px dashed #1a73e8;border-radius:8px;cursor:pointer;margin-bottom:16px">+ 재료 추가</button>` : ""}
         <div class="divider"></div>
         <p class="section-title">조리 방법</p>
-        <div>${(r.steps||[]).map((s,i)=>`
-          <div class="step-row"><div class="step-num">${i+1}</div><div class="step-text">${s}</div></div>
-        `).join("")}</div>
+        <div id="steps-list">
+          ${(r.steps||[]).map((s, i) => editable ? `
+            <div class="step-row">
+              <div class="step-num">${i+1}</div>
+              <textarea id="step-${i}" style="width:100%;padding:8px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;line-height:1.6;resize:vertical">${s}</textarea>
+              <button onclick="removeStep(${i})" style="background:#fdecea;color:#c62828;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;flex-shrink:0">✕</button>
+            </div>
+          ` : `
+            <div class="step-row"><div class="step-num">${i+1}</div><div class="step-text">${s}</div></div>
+          `).join("")}
+        </div>
+        ${editable ? `
+          <button onclick="addStep()" style="width:100%;padding:8px;background:#f0f7ff;color:#1a73e8;border:1.5px dashed #1a73e8;border-radius:8px;cursor:pointer;margin-top:8px">+ 단계 추가</button>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button onclick="cancelEdit()" style="flex:1;padding:10px;background:#f5f5f5;color:#666;border:none;border-radius:8px;cursor:pointer;font-size:14px">취소</button>
+            <button onclick="applyEdit()" style="flex:2;padding:10px;background:#1a73e8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">✅ 수정 완료</button>
+          </div>
+        ` : `
+          <button onclick="startEdit()" style="width:100%;padding:10px;background:#f0f7ff;color:#1a73e8;border:1.5px solid #1a73e8;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;margin-top:16px">✏️ 레시피 수정하기</button>
+        `}
       </div>`;
   }
 
@@ -515,6 +562,53 @@
       await fetch(`${SERVER}/api/recipes/${id}`, { method: "DELETE" });
       loadSavedRecipes("전체");
     } catch (e) { alert("삭제 실패"); }
+  }
+
+  function startEdit() { renderRecipe(allRecipes[currentRecipeIdx], true); }
+  function cancelEdit() { renderRecipe(allRecipes[currentRecipeIdx], false); }
+
+  function applyEdit() {
+    const r = allRecipes[currentRecipeIdx];
+    r.title = document.getElementById("edit-title").value;
+    r.description = document.getElementById("edit-desc").value;
+    r.time = document.getElementById("edit-time").value;
+    r.servings = document.getElementById("edit-servings").value;
+    r.ingredients = r.ingredients.map((ing, i) => ({
+      name: document.getElementById(`ing-name-${i}`)?.value || ing.name,
+      amount: document.getElementById(`ing-amount-${i}`)?.value || ing.amount
+    }));
+    r.steps = r.steps.map((s, i) => document.getElementById(`step-${i}`)?.value || s);
+    allRecipes[currentRecipeIdx] = r;
+    document.querySelectorAll(".recipe-tab")[currentRecipeIdx].textContent = r.title;
+    renderRecipe(r, false);
+  }
+
+  function addIngredient() {
+    const r = allRecipes[currentRecipeIdx];
+    r.ingredients.push({ name: "", amount: "" });
+    allRecipes[currentRecipeIdx] = r;
+    renderRecipe(r, true);
+  }
+
+  function removeIngredient(idx) {
+    const r = allRecipes[currentRecipeIdx];
+    r.ingredients.splice(idx, 1);
+    allRecipes[currentRecipeIdx] = r;
+    renderRecipe(r, true);
+  }
+
+  function addStep() {
+    const r = allRecipes[currentRecipeIdx];
+    r.steps.push("");
+    allRecipes[currentRecipeIdx] = r;
+    renderRecipe(r, true);
+  }
+
+  function removeStep(idx) {
+    const r = allRecipes[currentRecipeIdx];
+    r.steps.splice(idx, 1);
+    allRecipes[currentRecipeIdx] = r;
+    renderRecipe(r, true);
   }
 
   function showError(msg) { const e = document.getElementById("error"); e.textContent = msg; e.classList.remove("hidden"); }
