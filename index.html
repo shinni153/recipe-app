@@ -637,17 +637,35 @@
   function changeServings(delta) {
     currentServings = Math.max(1, currentServings + delta);
     const ratio = currentServings / baseServings;
+
+    // 인분 수 텍스트 업데이트
+    document.getElementById("detail-servings").textContent = currentServings + "인분";
+
+    // 재료 목록 업데이트
     const scaledIngredients = baseIngredients.map(ing => ({
       ...ing, amount: scaleAmount(ing.amount, ratio)
     }));
-    // 인분 수 텍스트 업데이트
-    document.getElementById("detail-servings").textContent = currentServings + "인분";
-    // 재료 목록 업데이트
     const ingList = document.getElementById("detail-ingredients");
     if (ingList) {
       ingList.innerHTML = scaledIngredients.map(ing => `
         <div class="ingredient-row"><span>${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>
       `).join("");
+    }
+
+    // 영양정보 업데이트
+    const r = document.getElementById("saved-detail")._savedRecipe;
+    if (r.nutrition) {
+      const scaleNum = (val) => {
+        const n = parseFloat(val);
+        if (isNaN(n)) return val;
+        const scaled = Math.round(n * ratio * 10) / 10;
+        return (scaled % 1 === 0 ? scaled : scaled.toFixed(1)) + (val.replace(/[\d.]/g, "") || "");
+      };
+      const nutEls = document.querySelectorAll(".nutrition-value");
+      const keys = ["calories", "carbs", "protein", "fat"];
+      keys.forEach((k, i) => {
+        if (nutEls[i]) nutEls[i].textContent = scaleNum(r.nutrition[k]);
+      });
     }
   }
 
