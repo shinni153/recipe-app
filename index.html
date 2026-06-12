@@ -438,6 +438,15 @@
             <div class="meta-item"><div class="meta-label">인분</div><div class="meta-value">${r.servings||"-"}</div></div>
           </div>
         `}
+        ${!editable ? `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#f7f8fa;border-radius:10px;padding:12px 16px">
+          <span style="font-size:14px;font-weight:600;color:#555">인분 수</span>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+            <button onclick="changeServings(-1)" style="width:32px;height:32px;border-radius:50%;border:1.5px solid #ddd;background:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+            <span style="font-size:16px;font-weight:700;min-width:40px;text-align:center">${currentServings}인분</span>
+            <button onclick="changeServings(1)" style="width:32px;height:32px;border-radius:50%;border:1.5px solid #ddd;background:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+          </div>
+        </div>` : ""}
         ${r.nutrition ? `
         <p class="section-title">예상 영양 정보 (참고용)</p>
         <div class="nutrition-grid">
@@ -449,7 +458,7 @@
         <div class="divider"></div>
         <p class="section-title">재료</p>
         <div style="margin-bottom:20px">
-          ${(r.ingredients||[]).map((ing, i) => editable ? `
+          ${(scaledIngredients||[]).map((ing, i) => editable ? `
             <div class="ingredient-row">
               <input type="text" value="${ing.name}" id="ing-name-${i}" style="width:55%;padding:6px 8px">
               <input type="text" value="${ing.amount}" id="ing-amount-${i}" style="width:35%;padding:6px 8px">
@@ -621,22 +630,70 @@
   }
 
   // ── 저장된 레시피 상세 ───────────────────────────────────────
+  function changeServings(delta) {
+    const el = document.getElementById("saved-detail");
+    const r = el._savedRecipe;
+    el._currentServings = Math.max(1, (el._currentServings || 2) + delta);
+    renderSavedRecipe(r, false);
+  }
+
   function showSavedDetail(r) {
     const overlay = document.getElementById("detail-overlay");
     const el = document.getElementById("saved-detail");
     el._savedRecipe = r;
+    el._baseServings = null;
+    el._currentServings = null;
+    el._baseIngredients = null;
     overlay.style.display = "flex";
     document.body.style.overflow = "hidden";
     renderSavedRecipe(r, false);
   }
 
   function closeDetail() {
+    const el = document.getElementById("saved-detail");
+    el._baseServings = null;
+    el._currentServings = null;
+    el._baseIngredients = null;
     document.getElementById("detail-overlay").style.display = "none";
     document.body.style.overflow = "";
   }
 
+  // ── 인분 수 조절 ─────────────────────────────────────────────
+  function parseAmount(amountStr) {
+    if (!amountStr) return null;
+    const match = amountStr.match(/^([\d.\/]+)/);
+    if (!match) return null;
+    const raw = match[1];
+    if (raw.includes('/')) {
+      const [a, b] = raw.split('/');
+      return parseFloat(a) / parseFloat(b);
+    }
+    return parseFloat(raw);
+  }
+
+  function scaleAmount(amountStr, ratio) {
+    if (!amountStr) return amountStr;
+    const num = parseAmount(amountStr);
+    if (!num) return amountStr;
+    const scaled = Math.round(num * ratio * 10) / 10;
+    return amountStr.replace(/^[\d.\/]+/, scaled % 1 === 0 ? String(scaled) : scaled.toFixed(1));
+  }
+
   function renderSavedRecipe(r, editable = false) {
     const el = document.getElementById("saved-detail");
+    const baseServings = el._baseServings || parseFloat(r.servings) || 2;
+    const currentServings = el._currentServings || baseServings;
+    if (!el._baseServings) {
+      el._baseServings = baseServings;
+      el._currentServings = baseServings;
+      el._baseIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
+    }
+    const ratio = currentServings / baseServings;
+    const scaledIngredients = el._baseIngredients.map(ing => ({
+      ...ing,
+      amount: scaleAmount(ing.amount, ratio)
+    }));
+
     el.innerHTML = `
       ${r.thumbnail_url ? `
         <div style="position:relative;margin-bottom:16px">
