@@ -94,7 +94,7 @@ async function analyzeVideoWithGemini(youtubeUrl) {
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(`Gemini 서버가 일시적으로 혼잡해요. 잠시 후 다시 시도해주세요.`);
+    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
   }
   const data = await res.json();
   console.log("Gemini 응답:", JSON.stringify(data).slice(0, 300));
@@ -119,7 +119,7 @@ async function analyzeTranscriptWithGemini(transcript) {
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(`Gemini 서버가 일시적으로 혼잡해요. 잠시 후 다시 시도해주세요.`);
+    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -191,7 +191,8 @@ app.get("/api/recipes", async (req, res) => {
   const { category } = req.query;
   try {
     let query = supabase.from("recipes").select("*").order("created_at", { ascending: false });
-    if (category && category !== "전체") query = query.eq("category", category);
+    if (category === "즐겨찾기") query = query.eq("is_favorite", true);
+    else if (category && category !== "전체") query = query.eq("category", category);
     const { data, error } = await query;
     if (error) throw error;
     res.json({ recipes: data });
@@ -221,6 +222,21 @@ app.put("/api/recipes/:id", async (req, res) => {
   } catch (e) {
     console.error("수정 실패:", e.message);
     res.status(500).json({ error: "수정 실패: " + e.message });
+  }
+});
+
+// ── 즐겨찾기 토글 ────────────────────────────────────────────
+app.put("/api/recipes/:id/favorite", async (req, res) => {
+  const { id } = req.params;
+  const { is_favorite } = req.body;
+  try {
+    const { error } = await supabase.from("recipes")
+      .update({ is_favorite })
+      .eq("id", id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "즐겨찾기 실패: " + e.message });
   }
 });
 

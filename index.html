@@ -200,6 +200,7 @@
     <div id="main-saved" class="hidden">
       <div class="category-filter">
         <button class="cat-btn active" data-cat="전체">전체</button>
+        <button class="cat-btn" data-cat="즐겨찾기">❤️ 즐겨찾기</button>
         <button class="cat-btn" data-cat="한식">🍚 한식</button>
         <button class="cat-btn" data-cat="양식">🍝 양식</button>
         <button class="cat-btn" data-cat="일식">🍣 일식</button>
@@ -209,6 +210,11 @@
         <button class="cat-btn" data-cat="음료">☕ 음료</button>
         <button class="cat-btn" data-cat="기타">📌 기타</button>
       </div>
+      <!-- 검색 -->
+      <div style="position:relative;margin-bottom:16px">
+        <input type="text" id="search-input" placeholder="🔍 레시피 검색..." style="width:100%;padding:11px 14px 11px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;outline:none;" oninput="filterSearch(this.value)">
+      </div>
+
       <div id="saved-list"></div>
     </div>
   </div>
@@ -590,7 +596,57 @@
     }
   }
 
-  function filterCategory(cat) { loadSavedRecipes(cat); }
+  let allSavedRecipes = [];
+
+  function filterSearch(keyword) {
+    const filtered = keyword.trim()
+      ? allSavedRecipes.filter(r => r.title?.toLowerCase().includes(keyword.toLowerCase()))
+      : allSavedRecipes;
+    renderSavedList(filtered);
+  }
+
+  function renderSavedList(recipes) {
+    const list = document.getElementById("saved-list");
+    if (!recipes || recipes.length === 0) {
+      list.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;color:#888">
+          <div style="font-size:48px;margin-bottom:12px">🍽️</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:6px">레시피가 없어요</div>
+          <div style="font-size:14px">다른 검색어나 카테고리를 시도해보세요!</div>
+        </div>`;
+      return;
+    }
+    list.innerHTML = recipes.map(r => `
+      <div class="saved-recipe-card" data-id="${r.id}">
+        ${r.thumbnail_url
+          ? `<img class="saved-recipe-thumb" src="${r.thumbnail_url}" alt="${r.title}" onerror="this.style.display='none'">`
+          : `<div class="saved-recipe-thumb-placeholder">🍳</div>`}
+        <div class="saved-recipe-body">
+          <div class="saved-recipe-title">${r.title}</div>
+          <div class="saved-recipe-meta">
+            <span class="category-badge">${r.category}</span>
+            ${r.time ? `⏱ ${r.time}` : ""}
+            ${r.servings ? `· ${r.servings}` : ""}
+          </div>
+          <div class="card-actions">
+            ${r.source_url ? `<a class="source-link" href="${r.source_url}" target="_blank" onclick="event.stopPropagation()">▶ 유튜브에서 보기</a>` : '<span></span>'}
+            <div style="display:flex;gap:6px;align-items:center">
+              <button onclick="event.stopPropagation();toggleFavorite('${r.id}', ${r.is_favorite})" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">${r.is_favorite ? '❤️' : '🤍'}</button>
+              <button class="delete-btn" data-id="${r.id}" onclick="event.stopPropagation();deleteRecipe('${r.id}')">삭제</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".saved-recipe-card").forEach(card => {
+      card.addEventListener("click", () => {
+        const id = card.dataset.id;
+        const recipe = recipes.find(r => String(r.id) === String(id));
+        if (recipe) showSavedDetail(recipe);
+      });
+    });
+  }
 
   // ── 저장된 레시피 상세 (시트) ────────────────────────────────
   function showSavedDetail(r) {
