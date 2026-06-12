@@ -94,7 +94,7 @@ async function analyzeVideoWithGemini(youtubeUrl) {
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
+    throw new Error(`Gemini 서버가 일시적으로 혼잡해요. 잠시 후 다시 시도해주세요.`);
   }
   const data = await res.json();
   console.log("Gemini 응답:", JSON.stringify(data).slice(0, 300));
@@ -119,7 +119,7 @@ async function analyzeTranscriptWithGemini(transcript) {
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
+    throw new Error(`Gemini 서버가 일시적으로 혼잡해요. 잠시 후 다시 시도해주세요.`);
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
