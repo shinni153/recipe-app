@@ -241,6 +241,9 @@
   let currentServings = 2;
   let baseServings = 2;
   let baseIngredients = [];
+  let extractServings = 2;
+  let extractBaseServings = 2;
+  let extractBaseIngredients = [];
 
   // ── 초기화 ──────────────────────────────────────────────────
   async function init() {
@@ -416,7 +419,36 @@
   function selectRecipe(idx) {
     currentRecipeIdx = idx;
     document.querySelectorAll(".recipe-tab").forEach((t, i) => t.classList.toggle("active", i === idx));
-    renderRecipe(allRecipes[idx]);
+    const r = allRecipes[idx];
+    extractBaseServings = parseFloat(r.servings) || 2;
+    extractServings = extractBaseServings;
+    extractBaseIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
+    renderRecipe(r);
+  }
+
+  function changeExtractServings(delta) {
+    extractServings = Math.max(1, extractServings + delta);
+    const ratio = extractServings / extractBaseServings;
+    document.getElementById("extract-servings").textContent = extractServings + "인분";
+    const ingList = document.getElementById("extract-ingredients");
+    if (ingList) {
+      ingList.innerHTML = extractBaseIngredients.map(ing => `
+        <div class="ingredient-row"><span>${ing.name}</span><span class="ingredient-amount">${scaleAmount(ing.amount, ratio)}</span></div>
+      `).join("");
+    }
+    // 영양정보
+    const r = allRecipes[currentRecipeIdx];
+    if (r.nutrition) {
+      const scaleNum = (val) => {
+        const n = parseFloat(val);
+        if (isNaN(n)) return val;
+        const scaled = Math.round(n * ratio * 10) / 10;
+        return (scaled % 1 === 0 ? scaled : scaled.toFixed(1)) + (val.replace(/[\d.]/g, "") || "");
+      };
+      const nutEls = document.querySelectorAll("#result .nutrition-value");
+      const keys = ["calories", "carbs", "protein", "fat"];
+      keys.forEach((k, i) => { if (nutEls[i]) nutEls[i].textContent = scaleNum(r.nutrition[k]); });
+    }
   }
 
   function renderRecipe(r, editable = false) {
@@ -434,7 +466,14 @@
           <div class="recipe-desc">${r.description||""}</div>
           <div class="meta-grid">
             <div class="meta-item"><div class="meta-label">조리 시간</div><div class="meta-value">${r.time||"-"}</div></div>
-            <div class="meta-item"><div class="meta-label">인분</div><div class="meta-value">${r.servings||"-"}</div></div>
+            <div class="meta-item">
+              <div class="meta-label">인분</div>
+              <div class="servings-control">
+                <button class="servings-btn" onclick="changeExtractServings(-1)">−</button>
+                <span id="extract-servings" style="font-size:16px;font-weight:700">${extractServings}인분</span>
+                <button class="servings-btn" onclick="changeExtractServings(1)">+</button>
+              </div>
+            </div>
           </div>
         `}
         ${r.nutrition ? `
@@ -447,7 +486,7 @@
         </div>` : ""}
         <div class="divider"></div>
         <p class="section-title">재료</p>
-        <div style="margin-bottom:20px">
+        <div id="extract-ingredients" style="margin-bottom:20px">
           ${(r.ingredients||[]).map((ing, i) => editable ? `
             <div class="ingredient-row">
               <input type="text" value="${ing.name}" id="ing-name-${i}" style="width:55%;padding:6px 8px">
