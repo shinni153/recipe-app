@@ -420,7 +420,7 @@
     currentRecipeIdx = idx;
     document.querySelectorAll(".recipe-tab").forEach((t, i) => t.classList.toggle("active", i === idx));
     const r = allRecipes[idx];
-    extractBaseServings = parseFloat(r.servings) || 2;
+    extractBaseServings = parseFloat(r.servings) || 1;
     extractServings = extractBaseServings;
     extractBaseIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
     renderRecipe(r);
@@ -710,7 +710,7 @@
 
   // ── 저장된 레시피 상세 ───────────────────────────────────────
   function showSavedDetail(r) {
-    currentServings = parseFloat(r.servings) || 2;
+    currentServings = parseFloat(r.servings) || 1;
     baseServings = currentServings;
     baseIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
     const overlay = document.getElementById("detail-overlay");
