@@ -62,6 +62,11 @@ const RECIPE_PROMPT = `이 유튜브 영상을 분석해서 나오는 레시피�
 nutrition은 재료 기반으로 반드시 예상 수치를 계산해서 실제 숫자로 채워줘. N/A 금지.
 steps는 최소 8단계 이상, 베이스 만들기부터 완성까지 전체 과정 상세하게.`;
 
+// ── 유튜브 썸네일 URL 생성 ───────────────────────────────────
+function getThumbnailUrl(videoId) {
+  return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+}
+
 // ── Supadata 자막 추출 ───────────────────────────────────────
 async function getTranscriptSupadata(videoId) {
   const res = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}`, {
@@ -131,11 +136,13 @@ app.post("/api/extract", async (req, res) => {
   const videoId = url.match(/(?:v=|youtu\.be\/|shorts\/)([^&?/]+)/)?.[1];
   if (!videoId) return res.status(400).json({ error: "유효한 유튜브 URL이 아니에요." });
 
+  const thumbnailUrl = getThumbnailUrl(videoId);
+
   try {
     console.log("🎬 Gemini 영상 직접 분석 시도");
     const recipes = await analyzeVideoWithGemini(url);
     console.log("✅ Gemini 영상 분석 성공! 레시피", recipes.length, "개");
-    return res.json({ recipes, method: "gemini_video" });
+    return res.json({ recipes, method: "gemini_video", thumbnailUrl });
   } catch (e) {
     console.log("❌ Gemini 영상 분석 실패:", e.message);
   }
@@ -146,7 +153,7 @@ app.post("/api/extract", async (req, res) => {
     console.log("✅ 자막 추출 성공:", transcript.length, "자");
     const recipes = await analyzeTranscriptWithGemini(transcript);
     console.log("✅ Gemini 분석 성공! 레시피", recipes.length, "개");
-    return res.json({ recipes, method: "transcript" });
+    return res.json({ recipes, method: "transcript", thumbnailUrl });
   } catch (e) {
     console.log("❌ 실패:", e.message);
     return res.status(500).json({ error: "레시피 추출에 실패했어요: " + e.message });
@@ -155,19 +162,20 @@ app.post("/api/extract", async (req, res) => {
 
 // ── 레시피 저장 ──────────────────────────────────────────────
 app.post("/api/save-recipe", async (req, res) => {
-  const { recipe, category, source_url } = req.body;
+  const { recipe, category, source_url, thumbnail_url } = req.body;
   if (!recipe) return res.status(400).json({ error: "레시피가 없어요." });
   try {
     const { data, error } = await supabase.from("recipes").insert([{
-      title:       recipe.title,
-      description: recipe.description,
-      category:    category || "기타",
-      servings:    recipe.servings,
-      time:        recipe.time,
-      ingredients: recipe.ingredients,
-      steps:       recipe.steps,
-      nutrition:   recipe.nutrition,
-      source_url:  source_url || ""
+      title:         recipe.title,
+      description:   recipe.description,
+      category:      category || "기타",
+      servings:      recipe.servings,
+      time:          recipe.time,
+      ingredients:   recipe.ingredients,
+      steps:         recipe.steps,
+      nutrition:     recipe.nutrition,
+      source_url:    source_url || "",
+      thumbnail_url: thumbnail_url || ""
     }]).select();
     if (error) throw error;
     console.log("✅ 레시피 저장 성공:", recipe.title);
