@@ -63,8 +63,7 @@
     .step-num { min-width: 28px; height: 28px; border-radius: 50%; background: #e8f0fe; color: #1a73e8; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
     .step-text { line-height: 1.7; padding-top: 4px; }
     .divider { height: 1px; background: #f0f0f0; margin: 20px 0; }
-    /* 레시피 카드 (저장 목록) */
-    .saved-recipe-card { background: #fff; border-radius: 14px; border: 1px solid #e8e8e8; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; cursor: pointer; transition: box-shadow 0.2s; }
+    .saved-recipe-card { background: #fff; border-radius: 14px; border: 1px solid #e8e8e8; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; cursor: pointer; transition: box-shadow 0.2s; position: relative; }
     .saved-recipe-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
     .saved-recipe-thumb { width: 100%; height: 160px; object-fit: cover; display: block; background: #f0f2f5; }
     .saved-recipe-thumb-placeholder { width: 100%; height: 100px; background: linear-gradient(135deg, #e8f0fe, #f0f7ff); display: flex; align-items: center; justify-content: center; font-size: 32px; }
@@ -76,6 +75,7 @@
     .source-link:hover { text-decoration: underline; }
     .delete-btn { padding: 4px 10px; background: #fdecea; color: #c62828; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
     .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+    .fav-btn { background: none; border: none; font-size: 22px; cursor: pointer; padding: 0; position: absolute; top: 10px; right: 10px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
     .category-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
     .cat-btn { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ddd; background: #fff; color: #888; cursor: pointer; font-size: 13px; font-weight: 500; }
     .cat-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
@@ -89,7 +89,6 @@
     .logout-btn { padding: 6px 12px; background: #f5f5f5; color: #666; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
     .thumbnail-preview { width: 100%; height: 180px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; }
     .hidden { display: none; }
-    /* 상세 보기 오버레이 */
     .detail-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
     .detail-sheet { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; }
     .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
@@ -164,21 +163,18 @@
       </div>
 
       <div id="result-section" class="hidden" style="margin-top:16px">
-        <!-- 썸네일 + 링크 -->
         <div id="thumbnail-area" class="hidden" style="margin-bottom:16px">
           <div style="position:relative">
             <img id="result-thumbnail" class="thumbnail-preview" />
             <a id="result-source-link" href="#" target="_blank"
-               style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
+               style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;text-decoration:none;">
               ▶ 유튜브에서 보기
             </a>
           </div>
         </div>
-
         <div id="method-badge"></div>
         <div id="recipe-tabs" class="recipe-tabs"></div>
         <div id="result"></div>
-
         <div class="card" style="margin-top:16px">
           <p class="section-title">레시피 저장하기</p>
           <select id="category-select" style="margin-bottom:10px">
@@ -198,7 +194,7 @@
 
     <!-- 저장 탭 -->
     <div id="main-saved" class="hidden">
-      <div class="category-filter">
+      <div class="category-filter" id="cat-filter">
         <button class="cat-btn active" data-cat="전체">전체</button>
         <button class="cat-btn" data-cat="즐겨찾기">❤️ 즐겨찾기</button>
         <button class="cat-btn" data-cat="한식">🍚 한식</button>
@@ -210,11 +206,9 @@
         <button class="cat-btn" data-cat="음료">☕ 음료</button>
         <button class="cat-btn" data-cat="기타">📌 기타</button>
       </div>
-      <!-- 검색 -->
       <div style="position:relative;margin-bottom:16px">
-        <input type="text" id="search-input" placeholder="🔍 레시피 검색..." style="width:100%;padding:11px 14px 11px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;outline:none;" oninput="filterSearch(this.value)">
+        <input type="text" id="search-input" placeholder="🔍 레시피 검색..." oninput="filterSearch(this.value)">
       </div>
-
       <div id="saved-list"></div>
     </div>
   </div>
@@ -243,6 +237,7 @@
   let allRecipes = [], currentRecipeIdx = 0;
   let currentUrl = "", currentThumbnail = "";
   let loadingTimer = null;
+  let allSavedRecipes = [];
 
   // ── 초기화 ──────────────────────────────────────────────────
   async function init() {
@@ -359,8 +354,7 @@
   async function extractYoutube() {
     const url = document.getElementById("youtube-url").value.trim();
     if (!url) return showError("유튜브 URL을 입력해주세요.");
-    currentUrl = url;
-    currentThumbnail = "";
+    currentUrl = url; currentThumbnail = "";
     hideError(); startLoading();
     try {
       const r = await fetch(`${SERVER}/api/extract`, {
@@ -369,15 +363,12 @@
       });
       const data = await r.json();
       if (data.error) throw new Error(data.error);
-
-      // 썸네일 표시
       if (data.thumbnailUrl) {
         currentThumbnail = data.thumbnailUrl;
         document.getElementById("result-thumbnail").src = data.thumbnailUrl;
         document.getElementById("result-source-link").href = url;
         document.getElementById("thumbnail-area").classList.remove("hidden");
       }
-
       const badge = document.getElementById("method-badge");
       badge.innerHTML = data.method === "gemini_video"
         ? '<span class="method-badge method-gemini">🎬 Gemini 영상 직접 분석</span>'
@@ -433,14 +424,8 @@
     document.getElementById("result").innerHTML = `
       <div class="recipe-card">
         ${editable ? `
-          <div style="margin-bottom:12px">
-            <label style="font-size:12px;color:#888">요리명</label>
-            <input type="text" id="edit-title" value="${r.title||""}" style="width:100%;margin-top:4px">
-          </div>
-          <div style="margin-bottom:12px">
-            <label style="font-size:12px;color:#888">한줄 설명</label>
-            <input type="text" id="edit-desc" value="${r.description||""}" style="width:100%;margin-top:4px">
-          </div>
+          <div style="margin-bottom:12px"><label style="font-size:12px;color:#888">요리명</label><input type="text" id="edit-title" value="${r.title||""}" style="width:100%;margin-top:4px"></div>
+          <div style="margin-bottom:12px"><label style="font-size:12px;color:#888">한줄 설명</label><input type="text" id="edit-desc" value="${r.description||""}" style="width:100%;margin-top:4px"></div>
           <div class="meta-grid" style="margin-bottom:12px">
             <div><label style="font-size:12px;color:#888">조리 시간</label><input type="text" id="edit-time" value="${r.time||""}" style="width:100%;margin-top:4px"></div>
             <div><label style="font-size:12px;color:#888">인분</label><input type="text" id="edit-servings" value="${r.servings||""}" style="width:100%;margin-top:4px"></div>
@@ -550,12 +535,14 @@
   // ── 저장된 레시피 목록 ──────────────────────────────────────
   async function loadSavedRecipes(category) {
     document.querySelectorAll(".cat-btn").forEach(b => b.classList.toggle("active", b.dataset.cat === category));
+    document.getElementById("search-input").value = "";
     const list = document.getElementById("saved-list");
     list.innerHTML = '<p style="color:#888;font-size:14px;text-align:center;padding:20px">불러오는 중...</p>';
     try {
-      const r = await fetch(`${SERVER}/api/recipes?category=${category}&user_id=${currentUser.id}`);
+      const r = await fetch(`${SERVER}/api/recipes?category=${encodeURIComponent(category)}&user_id=${currentUser.id}`);
       const data = await r.json();
-      if (!data.recipes || data.recipes.length === 0) {
+      allSavedRecipes = data.recipes || [];
+      if (allSavedRecipes.length === 0) {
         list.innerHTML = `
           <div style="text-align:center;padding:40px 20px;color:#888">
             <div style="font-size:48px;margin-bottom:12px">🍽️</div>
@@ -564,39 +551,13 @@
           </div>`;
         return;
       }
-      list.innerHTML = data.recipes.map(r => `
-        <div class="saved-recipe-card" data-id="${r.id}">
-          ${r.thumbnail_url
-            ? `<img class="saved-recipe-thumb" src="${r.thumbnail_url}" alt="${r.title}" onerror="this.style.display='none'">`
-            : `<div class="saved-recipe-thumb-placeholder">🍳</div>`}
-          <div class="saved-recipe-body">
-            <div class="saved-recipe-title">${r.title}</div>
-            <div class="saved-recipe-meta">
-              <span class="category-badge">${r.category}</span>
-              ${r.time ? `⏱ ${r.time}` : ""}
-              ${r.servings ? `· ${r.servings}` : ""}
-            </div>
-            <div class="card-actions">
-              ${r.source_url ? `<a class="source-link" href="${r.source_url}" target="_blank" onclick="event.stopPropagation()">▶ 유튜브에서 보기</a>` : '<span></span>'}
-              <button class="delete-btn" data-id="${r.id}" onclick="event.stopPropagation();deleteRecipe('${r.id}')">삭제</button>
-            </div>
-          </div>
-        </div>
-      `).join("");
-
-      document.querySelectorAll(".saved-recipe-card").forEach(card => {
-        card.addEventListener("click", () => {
-          const id = card.dataset.id;
-          const recipe = data.recipes.find(r => String(r.id) === String(id));
-          if (recipe) showSavedDetail(recipe);
-        });
-      });
+      renderSavedList(allSavedRecipes);
     } catch (e) {
       list.innerHTML = '<p style="color:#c62828;font-size:14px;text-align:center">불러오기 실패</p>';
     }
   }
 
-  let allSavedRecipes = [];
+  function filterCategory(cat) { loadSavedRecipes(cat); }
 
   function filterSearch(keyword) {
     const filtered = keyword.trim()
@@ -610,9 +571,9 @@
     if (!recipes || recipes.length === 0) {
       list.innerHTML = `
         <div style="text-align:center;padding:40px 20px;color:#888">
-          <div style="font-size:48px;margin-bottom:12px">🍽️</div>
-          <div style="font-size:16px;font-weight:600;margin-bottom:6px">레시피가 없어요</div>
-          <div style="font-size:14px">다른 검색어나 카테고리를 시도해보세요!</div>
+          <div style="font-size:48px;margin-bottom:12px">🔍</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:6px">검색 결과가 없어요</div>
+          <div style="font-size:14px">다른 검색어를 시도해보세요!</div>
         </div>`;
       return;
     }
@@ -621,6 +582,7 @@
         ${r.thumbnail_url
           ? `<img class="saved-recipe-thumb" src="${r.thumbnail_url}" alt="${r.title}" onerror="this.style.display='none'">`
           : `<div class="saved-recipe-thumb-placeholder">🍳</div>`}
+        <button class="fav-btn" onclick="event.stopPropagation();toggleFavorite('${r.id}', ${r.is_favorite})">${r.is_favorite ? '❤️' : '🤍'}</button>
         <div class="saved-recipe-body">
           <div class="saved-recipe-title">${r.title}</div>
           <div class="saved-recipe-meta">
@@ -630,10 +592,7 @@
           </div>
           <div class="card-actions">
             ${r.source_url ? `<a class="source-link" href="${r.source_url}" target="_blank" onclick="event.stopPropagation()">▶ 유튜브에서 보기</a>` : '<span></span>'}
-            <div style="display:flex;gap:6px;align-items:center">
-              <button onclick="event.stopPropagation();toggleFavorite('${r.id}', ${r.is_favorite})" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">${r.is_favorite ? '❤️' : '🤍'}</button>
-              <button class="delete-btn" data-id="${r.id}" onclick="event.stopPropagation();deleteRecipe('${r.id}')">삭제</button>
-            </div>
+            <button class="delete-btn" onclick="event.stopPropagation();deleteRecipe('${r.id}')">삭제</button>
           </div>
         </div>
       </div>
@@ -642,13 +601,26 @@
     document.querySelectorAll(".saved-recipe-card").forEach(card => {
       card.addEventListener("click", () => {
         const id = card.dataset.id;
-        const recipe = recipes.find(r => String(r.id) === String(id));
+        const recipe = allSavedRecipes.find(r => String(r.id) === String(id));
         if (recipe) showSavedDetail(recipe);
       });
     });
   }
 
-  // ── 저장된 레시피 상세 (시트) ────────────────────────────────
+  // ── 즐겨찾기 토글 ───────────────────────────────────────────
+  async function toggleFavorite(id, current) {
+    try {
+      await fetch(`${SERVER}/api/recipes/${id}/favorite`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_favorite: !current })
+      });
+      const cat = document.querySelector(".cat-btn.active")?.dataset.cat || "전체";
+      loadSavedRecipes(cat);
+    } catch (e) { alert("즐겨찾기 실패: " + e.message); }
+  }
+
+  // ── 저장된 레시피 상세 ───────────────────────────────────────
   function showSavedDetail(r) {
     const overlay = document.getElementById("detail-overlay");
     const el = document.getElementById("saved-detail");
@@ -671,7 +643,6 @@
           <img src="${r.thumbnail_url}" style="width:100%;height:180px;object-fit:cover;border-radius:10px">
           ${r.source_url ? `<a href="${r.source_url}" target="_blank" style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;text-decoration:none">▶ 유튜브에서 보기</a>` : ""}
         </div>` : r.source_url ? `<a href="${r.source_url}" target="_blank" class="source-link" style="display:inline-flex;margin-bottom:12px">▶ 유튜브에서 보기</a>` : ""}
-
       <div class="recipe-card">
         ${editable ? `
           <div style="margin-bottom:12px"><label style="font-size:12px;color:#888">요리명</label><input type="text" id="sedit-title" value="${r.title||""}" style="width:100%;margin-top:4px"></div>
@@ -737,7 +708,6 @@
 
   function startSavedEdit() { renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe, true); }
   function cancelSavedEdit() { renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe, false); }
-
   function applySavedEdit() {
     const el = document.getElementById("saved-detail");
     const r = el._savedRecipe;
@@ -753,7 +723,6 @@
     el._savedRecipe = r;
     updateSavedRecipe(r);
   }
-
   async function updateSavedRecipe(r) {
     try {
       const res = await fetch(`${SERVER}/api/recipes/${r.id}`, {
@@ -766,7 +735,6 @@
       loadSavedRecipes(document.querySelector(".cat-btn.active")?.dataset.cat || "전체");
     } catch (e) { alert("수정 저장 실패: " + e.message); }
   }
-
   function addSavedIngredient() { const el = document.getElementById("saved-detail"); el._savedRecipe.ingredients.push({name:"",amount:""}); renderSavedRecipe(el._savedRecipe, true); }
   function removeSavedIngredient(i) { const el = document.getElementById("saved-detail"); el._savedRecipe.ingredients.splice(i,1); renderSavedRecipe(el._savedRecipe, true); }
   function addSavedStep() { const el = document.getElementById("saved-detail"); el._savedRecipe.steps.push(""); renderSavedRecipe(el._savedRecipe, true); }
