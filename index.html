@@ -90,7 +90,7 @@
     .thumbnail-preview { width: 100%; height: 180px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; }
     .hidden { display: none; }
     /* 상세 보기 오버레이 */
-    .detail-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: flex-end; justify-content: center; }
+    .detail-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
     .detail-sheet { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; }
     .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .close-btn { width: 32px; height: 32px; border-radius: 50%; background: #f0f2f5; border: none; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
@@ -215,7 +215,7 @@
 </div>
 
 <!-- 저장된 레시피 상세 시트 -->
-<div id="detail-overlay" class="detail-overlay hidden">
+<div id="detail-overlay" class="detail-overlay">
   <div class="detail-sheet">
     <div class="detail-header">
       <span style="font-size:16px;font-weight:700">레시피 상세</span>
@@ -597,13 +597,13 @@
     const overlay = document.getElementById("detail-overlay");
     const el = document.getElementById("saved-detail");
     el._savedRecipe = r;
-    overlay.classList.remove("hidden");
+    overlay.style.display = "flex";
     document.body.style.overflow = "hidden";
     renderSavedRecipe(r, false);
   }
 
   function closeDetail() {
-    document.getElementById("detail-overlay").classList.add("hidden");
+    document.getElementById("detail-overlay").style.display = "none";
     document.body.style.overflow = "";
   }
 
