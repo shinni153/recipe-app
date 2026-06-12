@@ -21,11 +21,9 @@
     button.primary { width: 100%; padding: 13px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
     button.primary:hover { background: #1557b0; }
     button.primary:disabled { background: #aaa; cursor: not-allowed; }
-    button.save-btn { width: 100%; padding: 12px; background: #34a853; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
-    button.save-btn:hover { background: #2d8f47; }
+    button.save-btn { width: 100%; padding: 12px; background: #34a853; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; }
     button.save-btn:disabled { background: #aaa; cursor: not-allowed; }
-    .google-btn { width: 100%; padding: 13px; background: #fff; color: #333; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; }
-    .google-btn:hover { background: #f5f5f5; border-color: #1a73e8; }
+    .google-btn { width: 100%; padding: 13px; background: #fff; color: #333; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .section-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #555; }
     .error { background: #fdecea; color: #c62828; padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-top: 12px; }
     .success { background: #e8f5e9; color: #2e7d32; padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-top: 12px; }
@@ -44,7 +42,7 @@
     .step-icon.done { background: #1a73e8; color: #fff; }
     .step-icon.active { background: #fff; border: 2px solid #1a73e8; }
     .recipe-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-    .recipe-tab { padding: 7px 16px; border-radius: 20px; border: 1.5px solid #ddd; background: #fff; color: #888; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+    .recipe-tab { padding: 7px 16px; border-radius: 20px; border: 1.5px solid #ddd; background: #fff; color: #888; cursor: pointer; font-size: 13px; font-weight: 500; }
     .recipe-tab.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
     .recipe-card { background: #fff; border-radius: 14px; padding: 1.5rem; border: 1px solid #e8e8e8; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .recipe-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
@@ -53,6 +51,9 @@
     .meta-item { background: #f7f8fa; border-radius: 10px; padding: 12px 16px; }
     .meta-label { font-size: 11px; color: #999; margin-bottom: 4px; }
     .meta-value { font-size: 16px; font-weight: 600; }
+    .servings-control { display: flex; align-items: center; gap: 8px; }
+    .servings-btn { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid #1a73e8; background: #fff; color: #1a73e8; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; line-height: 1; }
+    .servings-btn:hover { background: #1a73e8; color: #fff; }
     .nutrition-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
     .nutrition-item { background: #f0f7ff; border-radius: 10px; padding: 10px 8px; text-align: center; }
     .nutrition-label { font-size: 11px; color: #888; margin-bottom: 4px; }
@@ -65,17 +66,16 @@
     .divider { height: 1px; background: #f0f0f0; margin: 20px 0; }
     .saved-recipe-card { background: #fff; border-radius: 14px; border: 1px solid #e8e8e8; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; cursor: pointer; transition: box-shadow 0.2s; position: relative; }
     .saved-recipe-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-    .saved-recipe-thumb { width: 100%; height: 160px; object-fit: cover; display: block; background: #f0f2f5; }
+    .saved-recipe-thumb { width: 100%; height: 160px; object-fit: cover; display: block; }
     .saved-recipe-thumb-placeholder { width: 100%; height: 100px; background: linear-gradient(135deg, #e8f0fe, #f0f7ff); display: flex; align-items: center; justify-content: center; font-size: 32px; }
     .saved-recipe-body { padding: 12px 16px 14px; }
     .saved-recipe-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
     .saved-recipe-meta { font-size: 12px; color: #888; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .category-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a73e8; }
-    .source-link { font-size: 12px; color: #1a73e8; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
-    .source-link:hover { text-decoration: underline; }
+    .source-link { font-size: 12px; color: #1a73e8; text-decoration: none; }
     .delete-btn { padding: 4px 10px; background: #fdecea; color: #c62828; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
     .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-    .fav-btn { background: none; border: none; font-size: 22px; cursor: pointer; padding: 0; position: absolute; top: 10px; right: 10px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+    .fav-btn { background: none; border: none; font-size: 22px; cursor: pointer; position: absolute; top: 10px; right: 10px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); padding: 0; }
     .category-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
     .cat-btn { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ddd; background: #fff; color: #888; cursor: pointer; font-size: 13px; font-weight: 500; }
     .cat-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
@@ -87,7 +87,7 @@
     .user-info { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; }
     .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #1a73e8; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
     .logout-btn { padding: 6px 12px; background: #f5f5f5; color: #666; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-    .thumbnail-preview { width: 100%; height: 180px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; }
+    .thumbnail-preview { width: 100%; height: 180px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
     .hidden { display: none; }
     .detail-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
     .detail-sheet { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; }
@@ -194,7 +194,7 @@
 
     <!-- 저장 탭 -->
     <div id="main-saved" class="hidden">
-      <div class="category-filter" id="cat-filter">
+      <div class="category-filter">
         <button class="cat-btn active" data-cat="전체">전체</button>
         <button class="cat-btn" data-cat="즐겨찾기">❤️ 즐겨찾기</button>
         <button class="cat-btn" data-cat="한식">🍚 한식</button>
@@ -206,7 +206,7 @@
         <button class="cat-btn" data-cat="음료">☕ 음료</button>
         <button class="cat-btn" data-cat="기타">📌 기타</button>
       </div>
-      <div style="position:relative;margin-bottom:16px">
+      <div style="margin-bottom:16px">
         <input type="text" id="search-input" placeholder="🔍 레시피 검색..." oninput="filterSearch(this.value)">
       </div>
       <div id="saved-list"></div>
@@ -238,6 +238,9 @@
   let currentUrl = "", currentThumbnail = "";
   let loadingTimer = null;
   let allSavedRecipes = [];
+  let currentServings = 2;
+  let baseServings = 2;
+  let baseIngredients = [];
 
   // ── 초기화 ──────────────────────────────────────────────────
   async function init() {
@@ -264,7 +267,6 @@
     document.getElementById("detail-overlay").addEventListener("click", e => {
       if (e.target === document.getElementById("detail-overlay")) closeDetail();
     });
-
     document.querySelectorAll(".cat-btn").forEach(btn => {
       btn.addEventListener("click", () => filterCategory(btn.dataset.cat));
     });
@@ -350,7 +352,6 @@
     document.getElementById("extract-image-btn").disabled = false;
   }
 
-  // ── 유튜브 추출 ─────────────────────────────────────────────
   async function extractYoutube() {
     const url = document.getElementById("youtube-url").value.trim();
     if (!url) return showError("유튜브 URL을 입력해주세요.");
@@ -369,8 +370,7 @@
         document.getElementById("result-source-link").href = url;
         document.getElementById("thumbnail-area").classList.remove("hidden");
       }
-      const badge = document.getElementById("method-badge");
-      badge.innerHTML = data.method === "gemini_video"
+      document.getElementById("method-badge").innerHTML = data.method === "gemini_video"
         ? '<span class="method-badge method-gemini">🎬 Gemini 영상 직접 분석</span>'
         : '<span class="method-badge method-transcript">📝 자막 기반 분석</span>';
       showRecipes(data.recipes);
@@ -378,7 +378,6 @@
     finally { stopLoading(); }
   }
 
-  // ── 이미지 추출 ─────────────────────────────────────────────
   async function extractImage() {
     if (!imageBase64) return showError("이미지를 업로드해주세요.");
     currentUrl = ""; currentThumbnail = "";
@@ -435,14 +434,7 @@
           <div class="recipe-desc">${r.description||""}</div>
           <div class="meta-grid">
             <div class="meta-item"><div class="meta-label">조리 시간</div><div class="meta-value">${r.time||"-"}</div></div>
-            <div class="meta-item">
-              <div class="meta-label">인분</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <button onclick="changeServings(-1)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid #ddd;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">−</button>
-                <span style="font-size:16px;font-weight:700">${currentServings}인분</span>
-                <button onclick="changeServings(1)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid #ddd;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>
-              </div>
-            </div>
+            <div class="meta-item"><div class="meta-label">인분</div><div class="meta-value">${r.servings||"-"}</div></div>
           </div>
         `}
         ${r.nutrition ? `
@@ -456,7 +448,7 @@
         <div class="divider"></div>
         <p class="section-title">재료</p>
         <div style="margin-bottom:20px">
-          ${(scaledIngredients||[]).map((ing, i) => editable ? `
+          ${(r.ingredients||[]).map((ing, i) => editable ? `
             <div class="ingredient-row">
               <input type="text" value="${ing.name}" id="ing-name-${i}" style="width:55%;padding:6px 8px">
               <input type="text" value="${ing.amount}" id="ing-amount-${i}" style="width:35%;padding:6px 8px">
@@ -614,84 +606,71 @@
     });
   }
 
-  // ── 즐겨찾기 토글 ───────────────────────────────────────────
+  // ── 즐겨찾기 ────────────────────────────────────────────────
   async function toggleFavorite(id, current) {
     try {
       await fetch(`${SERVER}/api/recipes/${id}/favorite`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_favorite: !current })
       });
-      const cat = document.querySelector(".cat-btn.active")?.dataset.cat || "전체";
-      loadSavedRecipes(cat);
+      loadSavedRecipes(document.querySelector(".cat-btn.active")?.dataset.cat || "전체");
     } catch (e) { alert("즐겨찾기 실패: " + e.message); }
   }
 
-  // ── 저장된 레시피 상세 ───────────────────────────────────────
-  function changeServings(delta) {
-    const el = document.getElementById("saved-detail");
-    const r = el._savedRecipe;
-    el._currentServings = Math.max(1, (el._currentServings || 2) + delta);
-    renderSavedRecipe(r, false);
+  // ── 인분 수 조절 ─────────────────────────────────────────────
+  function parseAmount(str) {
+    if (!str) return null;
+    const m = str.match(/^([\d.]+)/);
+    if (!m) return null;
+    return parseFloat(m[1]);
   }
 
+  function scaleAmount(str, ratio) {
+    if (!str) return str;
+    const num = parseAmount(str);
+    if (!num) return str;
+    const scaled = Math.round(num * ratio * 10) / 10;
+    const result = scaled % 1 === 0 ? String(scaled) : scaled.toFixed(1);
+    return str.replace(/^[\d.]+/, result);
+  }
+
+  function changeServings(delta) {
+    currentServings = Math.max(1, currentServings + delta);
+    const ratio = currentServings / baseServings;
+    const scaledIngredients = baseIngredients.map(ing => ({
+      ...ing, amount: scaleAmount(ing.amount, ratio)
+    }));
+    // 인분 수 텍스트 업데이트
+    document.getElementById("detail-servings").textContent = currentServings + "인분";
+    // 재료 목록 업데이트
+    const ingList = document.getElementById("detail-ingredients");
+    if (ingList) {
+      ingList.innerHTML = scaledIngredients.map(ing => `
+        <div class="ingredient-row"><span>${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>
+      `).join("");
+    }
+  }
+
+  // ── 저장된 레시피 상세 ───────────────────────────────────────
   function showSavedDetail(r) {
+    currentServings = parseFloat(r.servings) || 2;
+    baseServings = currentServings;
+    baseIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
     const overlay = document.getElementById("detail-overlay");
     const el = document.getElementById("saved-detail");
     el._savedRecipe = r;
-    el._baseServings = null;
-    el._currentServings = null;
-    el._baseIngredients = null;
     overlay.style.display = "flex";
     document.body.style.overflow = "hidden";
     renderSavedRecipe(r, false);
   }
 
   function closeDetail() {
-    const el = document.getElementById("saved-detail");
-    el._baseServings = null;
-    el._currentServings = null;
-    el._baseIngredients = null;
     document.getElementById("detail-overlay").style.display = "none";
     document.body.style.overflow = "";
   }
 
-  // ── 인분 수 조절 ─────────────────────────────────────────────
-  function parseAmount(amountStr) {
-    if (!amountStr) return null;
-    const match = amountStr.match(/^([\d.\/]+)/);
-    if (!match) return null;
-    const raw = match[1];
-    if (raw.includes('/')) {
-      const [a, b] = raw.split('/');
-      return parseFloat(a) / parseFloat(b);
-    }
-    return parseFloat(raw);
-  }
-
-  function scaleAmount(amountStr, ratio) {
-    if (!amountStr) return amountStr;
-    const num = parseAmount(amountStr);
-    if (!num) return amountStr;
-    const scaled = Math.round(num * ratio * 10) / 10;
-    return amountStr.replace(/^[\d.\/]+/, scaled % 1 === 0 ? String(scaled) : scaled.toFixed(1));
-  }
-
   function renderSavedRecipe(r, editable = false) {
     const el = document.getElementById("saved-detail");
-    const baseServings = el._baseServings || parseFloat(r.servings) || 2;
-    const currentServings = el._currentServings || baseServings;
-    if (!el._baseServings) {
-      el._baseServings = baseServings;
-      el._currentServings = baseServings;
-      el._baseIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
-    }
-    const ratio = currentServings / baseServings;
-    const scaledIngredients = el._baseIngredients.map(ing => ({
-      ...ing,
-      amount: scaleAmount(ing.amount, ratio)
-    }));
-
     el.innerHTML = `
       ${r.thumbnail_url ? `
         <div style="position:relative;margin-bottom:16px">
@@ -711,7 +690,14 @@
           <div class="recipe-desc">${r.description||""}</div>
           <div class="meta-grid">
             <div class="meta-item"><div class="meta-label">조리 시간</div><div class="meta-value">${r.time||"-"}</div></div>
-            <div class="meta-item"><div class="meta-label">인분</div><div class="meta-value">${r.servings||"-"}</div></div>
+            <div class="meta-item">
+              <div class="meta-label">인분</div>
+              <div class="servings-control">
+                <button class="servings-btn" onclick="changeServings(-1)">−</button>
+                <span id="detail-servings" style="font-size:16px;font-weight:700">${currentServings}인분</span>
+                <button class="servings-btn" onclick="changeServings(1)">+</button>
+              </div>
+            </div>
           </div>
         `}
         ${r.nutrition ? `
@@ -724,7 +710,7 @@
         </div>` : ""}
         <div class="divider"></div>
         <p class="section-title">재료</p>
-        <div style="margin-bottom:20px">
+        <div id="detail-ingredients" style="margin-bottom:20px">
           ${(r.ingredients||[]).map((ing, i) => editable ? `
             <div class="ingredient-row">
               <input type="text" value="${ing.name}" id="sing-name-${i}" style="width:55%;padding:6px 8px">
