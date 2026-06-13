@@ -237,6 +237,7 @@
   let allRecipes = [], currentRecipeIdx = 0;
   let currentUrl = "", currentThumbnail = "";
   let loadingTimer = null;
+  let loadingTimer2 = null;
   let allSavedRecipes = [];
   let currentServings = 2;
   let baseServings = 2;
@@ -327,32 +328,50 @@
     document.getElementById("extract-btn").disabled = true;
     document.getElementById("extract-image-btn").disabled = true;
     hideError();
-    let step = 0;
     [1,2,3,4,5].forEach(i => {
       document.getElementById(`ls${i}`).className = "loading-step";
       document.getElementById(`li${i}`).className = "step-icon";
       document.getElementById(`li${i}`).textContent = i;
     });
-    loadingTimer = setInterval(() => {
-      if (step > 0) {
-        document.getElementById(`ls${step}`).className = "loading-step done";
-        document.getElementById(`li${step}`).className = "step-icon done";
-        document.getElementById(`li${step}`).textContent = "✓";
-      }
-      step++;
-      if (step <= 5) {
-        document.getElementById(`ls${step}`).className = "loading-step active";
-        document.getElementById(`li${step}`).className = "step-icon active";
-      }
-      if (step > 5) clearInterval(loadingTimer);
-    }, 1500);
+    // 1단계 시작
+    setStep(1);
+    // 2단계: 2초 후
+    loadingTimer = setTimeout(() => setStep(2), 2000);
+    // 3단계: 5초 후 (AI 분석 중 - 여기서 실제 대기)
+    loadingTimer2 = setTimeout(() => setStep(3), 5000);
   }
 
-  function stopLoading() {
-    clearInterval(loadingTimer);
-    document.getElementById("loading-box").classList.add("hidden");
-    document.getElementById("extract-btn").disabled = false;
-    document.getElementById("extract-image-btn").disabled = false;
+  function setStep(step) {
+    // 이전 단계 완료 처리
+    for (let i = 1; i < step; i++) {
+      document.getElementById(`ls${i}`).className = "loading-step done";
+      document.getElementById(`li${i}`).className = "step-icon done";
+      document.getElementById(`li${i}`).textContent = "✓";
+    }
+    // 현재 단계 활성화
+    if (step <= 5) {
+      document.getElementById(`ls${step}`).className = "loading-step active";
+      document.getElementById(`li${step}`).className = "step-icon active";
+    }
+  }
+
+  function completeLoading(onDone) {
+    // API 응답 왔을 때 4단계 → 5단계 → 결과
+    clearTimeout(loadingTimer);
+    clearTimeout(loadingTimer2);
+    setStep(4);
+    setTimeout(() => {
+      setStep(5);
+      document.getElementById(`ls5`).className = "loading-step done";
+      document.getElementById(`li5`).className = "step-icon done";
+      document.getElementById(`li5`).textContent = "✓";
+      setTimeout(() => {
+        document.getElementById("loading-box").classList.add("hidden");
+        document.getElementById("extract-btn").disabled = false;
+        document.getElementById("extract-image-btn").disabled = false;
+        onDone();
+      }, 1000);
+    }, 1000);
   }
 
   async function extractYoutube() {
@@ -376,9 +395,15 @@
       document.getElementById("method-badge").innerHTML = data.method === "gemini_video"
         ? '<span class="method-badge method-gemini">🎬 Gemini 영상 직접 분석</span>'
         : '<span class="method-badge method-transcript">📝 자막 기반 분석</span>';
-      showRecipes(data.recipes);
-    } catch (e) { showError(e.message); }
-    finally { stopLoading(); }
+      completeLoading(() => showRecipes(data.recipes));
+    } catch (e) {
+      clearTimeout(loadingTimer);
+      clearTimeout(loadingTimer2);
+      document.getElementById("loading-box").classList.add("hidden");
+      document.getElementById("extract-btn").disabled = false;
+      document.getElementById("extract-image-btn").disabled = false;
+      showError(e.message);
+    }
   }
 
   async function extractImage() {
@@ -394,9 +419,15 @@
       const data = await r.json();
       if (data.error) throw new Error(data.error);
       document.getElementById("method-badge").innerHTML = '<span class="method-badge method-gemini">📸 Gemini 이미지 분석</span>';
-      showRecipes(data.recipes);
-    } catch (e) { showError(e.message); }
-    finally { stopLoading(); }
+      completeLoading(() => showRecipes(data.recipes));
+    } catch (e) {
+      clearTimeout(loadingTimer);
+      clearTimeout(loadingTimer2);
+      document.getElementById("loading-box").classList.add("hidden");
+      document.getElementById("extract-btn").disabled = false;
+      document.getElementById("extract-image-btn").disabled = false;
+      showError(e.message);
+    }
   }
 
   function showRecipes(recipes) {
