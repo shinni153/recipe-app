@@ -413,6 +413,17 @@
         </div>
         <div class="settings-item-value">1.0.0</div>
       </div>
+      <div class="settings-section-label">계정 관리</div>
+      <div class="settings-item" onclick="deleteAccount()" style="cursor:pointer">
+        <div class="settings-item-left">
+          <div class="settings-item-icon" style="background:rgba(255,59,48,0.15)">🗑️</div>
+          <div>
+            <div class="settings-item-title" style="color:var(--red)">회원 탈퇴</div>
+            <div style="font-size:12px;color:var(--gray3);margin-top:2px">탈퇴 시 모든 데이터가 즉시 삭제됩니다</div>
+          </div>
+        </div>
+        <div class="settings-item-arrow">›</div>
+      </div>
       <button class="btn-logout" id="logout-btn">로그아웃</button>
     </div>
   </div>
@@ -606,6 +617,21 @@
   async function loginWithGoogle() {
     await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.href } });
   }
+  async function deleteAccount() {
+    if (!confirm("정말 탈퇴하시겠어요?\n저장된 모든 레시피와 계정 정보가 즉시 삭제됩니다.")) return;
+    if (!confirm("한 번 더 확인합니다.\n탈퇴 후에는 복구가 불가능합니다.")) return;
+    try {
+      // 사용자 레시피 전체 삭제
+      await fetch(`${SERVER}/api/users/${currentUser.id}`, { method: "DELETE" });
+      // Supabase 로그아웃
+      await sb.auth.signOut();
+      showToast("탈퇴가 완료됐어요.", "success");
+      setTimeout(() => showScreen("login"), 1500);
+    } catch(e) {
+      showToast("탈퇴 처리 중 오류가 발생했어요. recipex.ai@gmail.com으로 문의해 주세요.", "error");
+    }
+  }
+
   async function logout() {
     if (!confirm("로그아웃 하시겠어요?")) return;
     await sb.auth.signOut();

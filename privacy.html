@@ -12,6 +12,8 @@
     .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #FF8A00, #FF6B00); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
     .logo-title { font-size: 20px; font-weight: 800; }
     .logo-title span { color: #FF8A00; }
+    .nav-links { display: flex; gap: 16px; margin-bottom: 32px; }
+    .nav-links a { font-size: 13px; color: #FF8A00; text-decoration: none; }
     h1 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
     .updated { font-size: 13px; color: #888; margin-bottom: 32px; }
     h2 { font-size: 17px; font-weight: 700; margin: 32px 0 12px; color: #111; padding-left: 12px; border-left: 3px solid #FF8A00; }
@@ -28,6 +30,7 @@
 </head>
 <body>
 <div class="container">
+
   <div class="logo">
     <div class="logo-icon">
       <svg width="24" height="24" viewBox="0 0 60 60" fill="none">
@@ -38,6 +41,10 @@
       </svg>
     </div>
     <div class="logo-title">Recipe<span>X</span></div>
+  </div>
+
+  <div class="nav-links">
+    <a href="terms.html">이용약관 →</a>
   </div>
 
   <h1>개인정보처리방침</h1>
@@ -52,6 +59,7 @@
     <li><strong>레시피 데이터</strong> — 사용자가 추출 및 저장한 레시피 내용</li>
     <li><strong>입력 데이터</strong> — 레시피 추출을 위해 입력한 유튜브 URL 및 업로드한 음식 사진</li>
     <li><strong>이용 기록</strong> — 레시피 추출 및 저장 기록</li>
+    <li><strong>자동 수집 정보</strong> — IP 주소, 브라우저 종류, 접속 기록, 기기 정보 (서비스 품질 개선 목적)</li>
   </ul>
 
   <h2>2. 정보 수집 목적</h2>
@@ -76,16 +84,17 @@
 
   <h2>4. 정보 보관 및 삭제</h2>
   <ul>
-    <li>수집된 정보는 서비스 제공 목적이 달성될 때까지 보관됩니다.</li>
-    <li>회원 탈퇴 시 관련 개인정보는 즉시 삭제됩니다.</li>
-    <li>삭제를 원하시면 <a href="mailto:recipex.ai@gmail.com">recipex.ai@gmail.com</a>으로 요청해 주세요.</li>
+    <li>수집된 정보는 회원 탈퇴 시 <strong>즉시 삭제</strong>됩니다.</li>
+    <li>앱 내 <strong>설정 → 회원 탈퇴</strong>를 통해 직접 삭제할 수 있습니다.</li>
+    <li>이메일 요청 시 접수 후 <strong>영업일 기준 3일 이내</strong> 삭제 처리됩니다.</li>
+    <li>삭제 요청: <a href="mailto:recipex.ai@gmail.com">recipex.ai@gmail.com</a></li>
   </ul>
 
   <h2>5. 사용자 권리</h2>
   <p>사용자는 언제든지 아래 권리를 행사할 수 있습니다:</p>
   <ul>
     <li>본인의 개인정보 열람 및 수정 요청</li>
-    <li>개인정보 삭제 요청 (회원 탈퇴)</li>
+    <li>개인정보 삭제 요청 (앱 내 회원 탈퇴 또는 이메일 요청)</li>
     <li>개인정보 처리 정지 요청</li>
   </ul>
 
@@ -110,9 +119,8 @@
     <p>처리 기간: 문의 접수 후 영업일 기준 3일 이내</p>
   </div>
 
-  <footer>
-    © 2026 RecipeX. All rights reserved.
-  </footer>
+  <footer>© 2026 RecipeX. All rights reserved.</footer>
+
 </div>
 </body>
 </html>
