@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>RecipeX</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     :root {
       --bg: #0F0F10;
@@ -1042,6 +1042,11 @@
           <button class="btn-detail-copy" onclick="copySavedRecipe()">📋 복사</button>
           ${r.source_url?`<a class="btn-detail-yt" href="${r.source_url}" target="_blank">▶ 영상</a>`:""}
         </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-detail-copy" style="flex:1" onclick="downloadPDF()">📄 PDF</button>
+          <button class="btn-detail-copy" style="flex:1" onclick="downloadImage()">🖼️ 이미지</button>
+          <button class="btn-detail-copy" style="flex:1" onclick="shareApp()">🔗 앱 공유</button>
+        </div>
         <button class="btn-delete" onclick="deleteRecipe('${r.id}')">🗑️ 삭제하기</button>
       `}`;
   }
@@ -1104,6 +1109,95 @@
     if(!confirm("정말 삭제할까요?")) return;
     try{await fetch(`${SERVER}/api/recipes/${id}`,{method:"DELETE"});closeDetail();loadSavedRecipes(document.querySelector(".cat-chip.active")?.dataset.cat||"전체");showToast("삭제됐어요.","success");}
     catch(e){showToast("삭제 실패","error");}
+  }
+
+  // ── 앱 공유 ──────────────────────────────────────────────────
+  function shareApp() {
+    const text = `📱 RecipeX\n영상 속 레시피를 AI로 자동 추출해주는 앱!\n\n🔗 recipe-app-eight-lake.vercel.app`;
+    if (navigator.share) {
+      navigator.share({ title: "RecipeX", text, url: "https://recipe-app-eight-lake.vercel.app" })
+        .catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text)
+        .then(() => showToast("앱 링크가 복사됐어요!", "success"))
+        .catch(() => showToast("복사 실패", "error"));
+    }
+  }
+
+  // ── PDF / 이미지 다운로드 ────────────────────────────────────
+  function getPrintData() {
+    const el = document.getElementById("saved-detail");
+    const r = el._savedRecipe;
+    const ratio = currentServings / baseServings;
+    const si = baseIngredients.map(ing => ({...ing, amount: scaleAmount(ing.amount, ratio)}));
+    return { r, si };
+  }
+
+  function buildPrintArea(r, si) {
+    const area = document.createElement("div");
+    area.id = "print-area";
+    area.innerHTML = `
+      <div class="print-title">${r.title||""}</div>
+      <div class="print-desc">${r.description||""}</div>
+      <div class="print-meta">
+        <span>⏱ ${r.time||"-"}</span>
+        <span>👥 ${currentServings}인분</span>
+      </div>
+      ${r.nutrition ? `
+      <div style="display:flex;gap:12px;margin-bottom:16px;font-size:12px">
+        <span>🔥 ${r.nutrition.calories}</span>
+        <span>탄수화물 ${r.nutrition.carbs}</span>
+        <span>단백질 ${r.nutrition.protein}</span>
+        <span>지방 ${r.nutrition.fat}</span>
+      </div>` : ""}
+      <div class="print-section">🥣 재료</div>
+      ${si.map(ing => `<div class="print-ing-row"><span>${ing.name}</span><span>${ing.amount}</span></div>`).join("")}
+      <div class="print-section">👨‍🍳 조리 방법</div>
+      ${(r.steps||[]).map((s,i) => `<div class="print-step-row"><div class="print-step-num">${i+1}</div><div>${s}</div></div>`).join("")}
+      <div class="print-footer">
+        <div style="font-size:14px;font-weight:800;margin-bottom:4px">Recipe<span style="color:#FF8A00">X</span></div>
+        <div style="font-size:11px;color:#aaa">영상 속 레시피를 추출하고 정리하세요</div>
+        <div style="font-size:11px;color:#FF8A00;margin-top:2px">recipe-app-eight-lake.vercel.app</div>
+      </div>
+    `;
+    return area;
+  }
+
+  function downloadPDF() {
+    const { r, si } = getPrintData();
+    const old = document.getElementById("print-area");
+    if (old) old.remove();
+    const area = buildPrintArea(r, si);
+    document.body.appendChild(area);
+    setTimeout(() => { window.print(); }, 300);
+  }
+
+  async function downloadImage() {
+    const { r, si } = getPrintData();
+    showToast("이미지 생성 중...", "");
+    const old = document.getElementById("print-area");
+    if (old) old.remove();
+    const area = buildPrintArea(r, si);
+    area.style.cssText = "position:fixed;top:-9999px;left:0;width:400px;padding:32px;background:white;font-family:sans-serif;color:#111;";
+    area.querySelectorAll(".print-title").forEach(el => el.style.cssText = "font-size:22px;font-weight:800;margin-bottom:6px");
+    area.querySelectorAll(".print-section").forEach(el => el.style.cssText = "font-size:14px;font-weight:700;margin:14px 0 6px;border-bottom:2px solid #FF8A00;padding-bottom:3px;color:#111");
+    area.querySelectorAll(".print-ing-row").forEach(el => el.style.cssText = "display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #eee");
+    area.querySelectorAll(".print-step-row").forEach(el => el.style.cssText = "display:flex;gap:8px;margin-bottom:8px;font-size:12px");
+    area.querySelectorAll(".print-step-num").forEach(el => el.style.cssText = "min-width:22px;height:22px;border-radius:50%;background:#FF8A00;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0");
+    area.querySelectorAll(".print-footer").forEach(el => el.style.cssText = "margin-top:20px;font-size:10px;color:#aaa;text-align:center");
+    document.body.appendChild(area);
+    try {
+      const canvas = await html2canvas(area, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      const link = document.createElement("a");
+      link.download = `${r.title||"레시피"}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      showToast("이미지 저장됐어요!", "success");
+    } catch(e) {
+      showToast("이미지 생성 실패", "error");
+    } finally {
+      area.remove();
+    }
   }
 
   // ── 유틸 ────────────────────────────────────────────────────
