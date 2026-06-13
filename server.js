@@ -245,11 +245,9 @@
 <body>
 
 <!-- 스플래시 -->
-<div id="splash" class="screen active">
+  <div id="splash" class="screen active">
   <div class="splash-logo">
-    <div class="splash-icon">
-      <img src="logo.png" style="width:80px;height:80px;object-fit:contain;border-radius:20px">
-    </div>
+    <img src="/logo.png" style="width:120px;height:120px;object-fit:contain;margin-bottom:16px">
     <div class="splash-title">레시피<span>X</span></div>
     <div class="splash-subtitle">영상 속 레시피를 추출하고 정리하세요</div>
   </div>
@@ -286,11 +284,9 @@
 </div>
 
 <!-- 로그인 -->
-<div id="login" class="screen">
+  <div id="login" class="screen">
   <div class="login-top">
-    <div class="login-icon">
-      <img src="logo.png" style="width:70px;height:70px;object-fit:contain">
-    </div>
+    <img src="/logo.png" style="width:140px;height:140px;object-fit:contain;margin-bottom:8px">
     <div class="login-title">레시피<span>X</span></div>
     <div class="login-subtitle">유튜브 영상에서 레시피를<br>자동으로 추출해요</div>
   </div>
