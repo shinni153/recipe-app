@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>RecipeX</title>
+  <title>레시피X</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
@@ -24,7 +24,7 @@
       --red: #FF3B30;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--white); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+    body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--white); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
     .screen { display: none; min-height: 100vh; flex-direction: column; }
     .screen.active { display: flex; }
 
@@ -255,7 +255,7 @@
         <polygon points="28,15 28,45 50,30" fill="white"/>
       </svg>
     </div>
-    <div class="splash-title">Recipe<span>X</span></div>
+    <div class="splash-title">레시피<span>X</span></div>
     <div class="splash-subtitle">영상 속 레시피를 추출하고 정리하세요</div>
   </div>
 </div>
@@ -301,7 +301,7 @@
         <polygon points="28,15 28,45 50,30" fill="white"/>
       </svg>
     </div>
-    <div class="login-title">Recipe<span>X</span></div>
+    <div class="login-title">레시피<span>X</span></div>
     <div class="login-subtitle">유튜브 영상에서 레시피를<br>자동으로 추출해요</div>
   </div>
   <div class="login-bottom">
@@ -318,7 +318,7 @@
   <!-- 홈 탭 -->
   <div id="tab-home" class="app-tab">
     <div class="app-header">
-      <div class="header-logo">Recipe<span>X</span></div>
+      <div class="header-logo">레시피<span>X</span></div>
     </div>
     <div class="app-content">
       <div class="home-greeting">
@@ -925,7 +925,7 @@
       `👨‍🍳 조리 방법`,
       ...(r.steps||[]).map((s,i)=>`${i+1}. ${s}`),
       ``,
-      `📱 RecipeX로 추출한 레시피`
+      `📱 레시피X로 추출한 레시피`
     ].join("\n");
     navigator.clipboard.writeText(text).then(()=>showToast("클립보드에 복사됐어요!", "success")).catch(()=>showToast("복사 실패", "error"));
   }
@@ -1159,9 +1159,9 @@
 
   // ── 앱 공유 ──────────────────────────────────────────────────
   function shareApp() {
-    const text = `📱 RecipeX\n영상 속 레시피를 AI로 자동 추출해주는 앱!\n\n🔗 recipe-app-eight-lake.vercel.app`;
+    const text = `📱 레시피X\n영상 속 레시피를 AI로 자동 추출해주는 앱!\n\n🔗 recipe-app-eight-lake.vercel.app`;
     if (navigator.share) {
-      navigator.share({ title: "RecipeX", text, url: "https://recipe-app-eight-lake.vercel.app" })
+      navigator.share({ title: "레시피X", text, url: "https://recipe-app-eight-lake.vercel.app" })
         .catch(() => {});
     } else {
       navigator.clipboard.writeText(text)
