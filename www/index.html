@@ -55,13 +55,11 @@
     .btn-ghost { width: 100%; padding: 14px; background: none; color: var(--gray2); border: none; font-size: 14px; cursor: pointer; font-family: inherit; }
 
     /* ── 로그인 ── */
-    #login { background: var(--bg); align-items: center; justify-content: center; padding: 40px 32px; }
-    .login-top { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
-    .login-icon { width: 90px; height: 90px; background: linear-gradient(135deg, #FF8A00, #FF6B00); border-radius: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 16px 48px rgba(255,138,0,0.35); margin-bottom: 8px; }
-    .login-title { font-size: 28px; font-weight: 800; }
-    .login-title span { color: var(--orange); }
-    .login-subtitle { font-size: 14px; color: var(--gray2); text-align: center; line-height: 1.6; }
-    .login-bottom { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    #login { background: var(--bg); align-items: center; justify-content: flex-end; padding: 0; position: relative; overflow: hidden; }
+    .login-bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('onboarding1.png'); background-size: cover; background-position: center top; }
+    .login-overlay { position: absolute; bottom: 0; left: 0; right: 0; height: 55%; background: linear-gradient(to bottom, transparent, rgba(15,15,16,0.97) 50%, #0F0F10 100%); }
+    .login-top { display: none; }
+    .login-bottom { position: relative; z-index: 2; width: 100%; display: flex; flex-direction: column; gap: 12px; padding: 0 32px 60px; }
     .btn-google { width: 100%; padding: 16px; background: var(--bg2); color: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; }
     .login-terms { font-size: 12px; color: var(--gray3); text-align: center; line-height: 1.6; }
 
@@ -245,16 +243,9 @@
 <body>
 
 <!-- 스플래시 -->
-<div id="splash" class="screen active">
+  <div id="splash" class="screen active">
   <div class="splash-logo">
-    <div class="splash-icon">
-      <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-        <path d="M12 10 L12 50" stroke="white" stroke-width="5" stroke-linecap="round"/>
-        <path d="M8 10 L16 10" stroke="white" stroke-width="5" stroke-linecap="round"/>
-        <path d="M8 22 L16 22" stroke="white" stroke-width="5" stroke-linecap="round"/>
-        <polygon points="28,15 28,45 50,30" fill="white"/>
-      </svg>
-    </div>
+    <img src="/logo.png" style="width:120px;height:120px;object-fit:contain;margin-bottom:16px">
     <div class="splash-title">레시피<span>X</span></div>
     <div class="splash-subtitle">영상 속 레시피를 추출하고 정리하세요</div>
   </div>
@@ -291,19 +282,9 @@
 </div>
 
 <!-- 로그인 -->
-<div id="login" class="screen">
-  <div class="login-top">
-    <div class="login-icon">
-      <svg width="50" height="50" viewBox="0 0 60 60" fill="none">
-        <path d="M12 10 L12 50" stroke="white" stroke-width="5" stroke-linecap="round"/>
-        <path d="M8 10 L16 10" stroke="white" stroke-width="5" stroke-linecap="round"/>
-        <path d="M8 22 L16 22" stroke="white" stroke-width="5" stroke-linecap="round"/>
-        <polygon points="28,15 28,45 50,30" fill="white"/>
-      </svg>
-    </div>
-    <div class="login-title">레시피<span>X</span></div>
-    <div class="login-subtitle">유튜브 영상에서 레시피를<br>자동으로 추출해요</div>
-  </div>
+  <div id="login" class="screen">
+  <div class="login-bg"></div>
+  <div class="login-overlay"></div>
   <div class="login-bottom">
     <button class="btn-google" id="google-login-btn">
       <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
