@@ -581,7 +581,7 @@
     if (session) currentUser = session.user;
 
     sb.auth.onAuthStateChange((event, session) => {
-      if (session) { currentUser = session.user; afterLogin(); }
+      if (session) { currentUser = session.user; afterLogin(); showScreen("app"); }
       else { currentUser = null; showScreen("login"); }
     });
 
