@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">레시피X</string>
     <string name="title_activity_main">레시피X</string>
-    <string name="package_name">com.recipex.app</string>
-    <string name="custom_url_scheme">com.recipex.app</string>
+    <string name="package_name">com.recipex.permeate</string>
+    <string name="custom_url_scheme">com.recipex.permeate</string>
 </resources>

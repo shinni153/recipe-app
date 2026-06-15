@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.recipex.app"
+    namespace = "com.recipex.permeate"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.recipex.app"
+        applicationId "com.recipex.permeate"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

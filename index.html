@@ -55,7 +55,7 @@
     .btn-ghost { width: 100%; padding: 14px; background: none; color: var(--gray2); border: none; font-size: 14px; cursor: pointer; font-family: inherit; }
 
     /* ── 로그인 ── */
-    #login { background: var(--bg); align-items: center; justify-content: flex-end; padding: 0; position: relative; overflow: hidden; }
+    #login { background: var(--bg); align-items: center; justify-content: flex-end; padding: 0; position: relative; overflow: hidden; min-height: 100vh; width: 100%; }
     .login-bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('onboarding1.png'); background-size: cover; background-position: center top; }
     .login-overlay { position: absolute; bottom: 0; left: 0; right: 0; height: 55%; background: linear-gradient(to bottom, transparent, rgba(15,15,16,0.97) 50%, #0F0F10 100%); }
     .login-top { display: none; }
@@ -238,6 +238,17 @@
 
     .divider { height: 1px; background: var(--border); margin: 16px 0; }
     .hidden { display: none !important; }
+
+    /* ── 별점/후기/메모 ── */
+    .rating-section { margin: 16px 0; }
+    .rating-label { font-size: 13px; color: var(--gray2); margin-bottom: 8px; font-weight: 600; }
+    .star-row { display: flex; gap: 8px; margin-bottom: 4px; }
+    .star { font-size: 28px; cursor: pointer; opacity: 0.3; transition: opacity 0.15s, transform 0.15s; }
+    .star.active { opacity: 1; }
+    .star:active { transform: scale(1.2); }
+    .rating-textarea { width: 100%; padding: 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--white); font-size: 14px; outline: none; font-family: inherit; resize: none; line-height: 1.6; margin-top: 8px; }
+    .rating-textarea:focus { border-color: var(--orange); }
+    .btn-rating-save { width: 100%; padding: 13px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -462,6 +473,7 @@
   <div id="loading-error-box" class="loading-error-box hidden">
     <div class="loading-error-title">😥 레시피 추출에 실패했어요</div>
     <div class="loading-error-reasons" id="loading-error-msg">
+      · AI 서버가 일시적으로 바빠서일 수 있어요. 잠시 후 다시 시도해주세요!<br><br>
       가능한 원인<br>
       · 자막이 없는 영상<br>
       · 비공개 또는 삭제된 영상<br>
@@ -514,6 +526,22 @@
       <button class="detail-close" id="close-detail">✕</button>
     </div>
     <div class="detail-body" id="saved-detail"></div>
+    <div class="divider"></div>
+    <div class="rating-section">
+      <div class="rating-label">⭐ 별점</div>
+      <div class="star-row" id="star-row">
+        <span class="star" data-v="1">★</span>
+        <span class="star" data-v="2">★</span>
+        <span class="star" data-v="3">★</span>
+        <span class="star" data-v="4">★</span>
+        <span class="star" data-v="5">★</span>
+      </div>
+      <div class="rating-label" style="margin-top:14px">💬 후기</div>
+      <textarea class="rating-textarea" id="review-input" rows="3" placeholder="이 레시피 어떠셨나요?"></textarea>
+      <div class="rating-label" style="margin-top:14px">📝 메모</div>
+      <textarea class="rating-textarea" id="memo-input" rows="3" placeholder="나만의 메모를 남겨보세요"></textarea>
+      <button class="btn-rating-save" id="rating-save-btn">저장하기</button>
+    </div>
   </div>
 </div>
 
@@ -549,7 +577,7 @@
     if (session) currentUser = session.user;
 
     sb.auth.onAuthStateChange((event, session) => {
-      if (session) { currentUser = session.user; afterLogin(); }
+      if (session) { currentUser = session.user; afterLogin(); showScreen("app"); }
       else { currentUser = null; showScreen("login"); }
     });
 
@@ -1001,11 +1029,33 @@
     document.getElementById("detail-overlay").style.display = "flex";
     document.body.style.overflow = "hidden";
     renderSavedRecipe(r, false);
+    // 별점/후기/메모 로드
+    setStars(r.rating||0);
+    document.getElementById("review-input").value = r.review||"";
+    document.getElementById("memo-input").value = r.memo||"";
+    document.getElementById("rating-save-btn").onclick = () => saveRating(r.id);
   }
 
   function closeDetail() {
     document.getElementById("detail-overlay").style.display = "none";
     document.body.style.overflow = "";
+  }
+
+  let currentRating = 0;
+  function setStars(v) {
+    currentRating = v;
+    document.querySelectorAll(".star").forEach(s => {
+      s.classList.toggle("active", parseInt(s.dataset.v) <= v);
+    });
+  }
+  document.getElementById("star-row").addEventListener("click", e => {
+    if (e.target.classList.contains("star")) setStars(parseInt(e.target.dataset.v));
+  });
+  async function saveRating(id) {
+    const review = document.getElementById("review-input").value;
+    const memo = document.getElementById("memo-input").value;
+    await sb.from("recipes").update({ rating: currentRating, review, memo }).eq("id", id);
+    showToast("저장됐어요! ⭐", "success");
   }
 
   function renderSavedRecipe(r, editable) {

@@ -1,4 +1,4 @@
-package com.recipex.app;
+package com.recipex.permeate;
 
 import com.getcapacitor.BridgeActivity;
 
