@@ -1312,24 +1312,31 @@
     toastTimer=setTimeout(()=>t.classList.remove("show"),3000);
   }
 
-// Capacitor 백버튼 핸들링
-document.addEventListener("ionBackButton", (ev) => {
-  ev.detail.register(10, () => {
-    const activeScreen = document.querySelector(".screen.active");
-    if (activeScreen?.id === "app") {
-      // 홈 탭이면 앱 종료 확인
-      if (document.querySelector(".tab-item.active")?.dataset.tab === "home") {
-        if (confirm("앱을 종료하시겠어요?")) navigator.app?.exitApp();
-      } else {
-        switchTab("home");
-      }
-    } else if (activeScreen?.id === "result-screen") {
-      showScreen("app");
-    } else if (activeScreen?.id === "loading-screen") {
-      clearTimers(); showScreen("app");
+document.addEventListener("backbutton", (ev) => {
+  // 상세 오버레이 열려있으면 닫기
+  if (document.getElementById("detail-overlay").style.display === "flex") {
+    closeDetail();
+    return;
+  }
+  
+  const activeScreen = document.querySelector(".screen.active");
+  
+  if (activeScreen?.id === "app") {
+    const activeTab = document.querySelector(".tab-item.active")?.dataset.tab;
+    if (activeTab === "home") {
+      // 홈에서 백버튼 → 앱 종료 확인
+      if (confirm("앱을 종료하시겠어요?")) navigator.app?.exitApp();
+    } else {
+      // 보관함/설정에서 백버튼 → 홈으로
+      switchTab("home");
     }
-  });
-});
+  } else if (activeScreen?.id === "result-screen") {
+    showScreen("app");
+  } else if (activeScreen?.id === "loading-screen") {
+    clearTimers(); showScreen("app");
+  }
+}, false);
+
 
   init();
 </script>
