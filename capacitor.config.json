@@ -1,5 +1,12 @@
 {
   "appId": "com.recipex.permeate",
   "appName": "레시피X",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "1097303903903-hftut27dnouitecp3b4i7aicmjtccqkg.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
 }
