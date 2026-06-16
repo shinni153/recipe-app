@@ -497,9 +497,15 @@
     if (session) currentUser = session.user;
 
     sb.auth.onAuthStateChange((event, session) => {
-      if (session) { currentUser=session.user; afterLogin(); showScreen("app"); }
-      else if (event === "SIGNED_OUT") { currentUser=null; showScreen("login"); }
-    });
+     if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+     currentUser = session.user;
+     if (!document.querySelector(".screen.active")?.id === "app") {
+      afterLogin(); showScreen("app");
+    }
+    } else if (event === "SIGNED_OUT") {
+    currentUser = null; showScreen("login");
+   }
+  });
 
     document.getElementById("google-login-btn").addEventListener("click", loginWithGoogle);
     document.getElementById("logout-btn").addEventListener("click", logout);
