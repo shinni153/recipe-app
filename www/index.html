@@ -623,26 +623,8 @@
     loadHistory();
   }
 
-   async function loginWithGoogle() {
-  try {
-    if (window.Capacitor?.isNativePlatform()) {
-      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-      await GoogleAuth.initialize();
-      const user = await GoogleAuth.signIn();
-      const { data, error } = await sb.auth.signInWithIdToken({
-        provider: 'google',
-        token: user.authentication.idToken,
-      });
-      if (error) throw error;
-    } else {
-      await sb.auth.signInWithOAuth({ 
-        provider: "google", 
-        options: { redirectTo: window.location.href } 
-      });
-    }
-  } catch(e) {
-    showToast("로그인 실패: " + e.message, "error");
-  }
+  async function loginWithGoogle() {
+  await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.href } });
 }
 
   async function deleteAccount() {
