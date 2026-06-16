@@ -8,256 +8,226 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     :root {
-      --bg: #0F0F10;
-      --bg2: #1A1A1B;
-      --bg3: #242425;
-      --orange: #FF8A00;
-      --orange2: #FF6B00;
-      --white: #FFFFFF;
-      --gray1: #F5F5F7;
-      --gray2: #AEAEB2;
-      --gray3: #636366;
-      --gray4: #3A3A3C;
-      --border: #2C2C2E;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --red: #FF3B30;
+      --bg:#0F0F10; --bg2:#1A1A1B; --bg3:#242425;
+      --orange:#FF8A00; --orange2:#FF6B00;
+      --white:#FFFFFF; --gray1:#F5F5F7; --gray2:#AEAEB2; --gray3:#636366; --gray4:#3A3A3C;
+      --border:#2C2C2E; --radius:16px; --radius-sm:10px; --red:#FF3B30;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--white); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
-    .screen { display: none; min-height: 100vh; flex-direction: column; }
-    .screen.active { display: flex; }
-
-    <!-- 스플래시 -->
-   <div id="splash" class="screen active">
-   <div class="splash-logo">
-   <img src="/logo.png" style="width:240px;height:240px;object-fit:contain;">
-    </div>
-    </div>
-
-
-    /* ── 온보딩 ── */
-    #onboarding { background: var(--bg); }
-    .onboarding-slides { flex: 1; overflow: hidden; position: relative; }
-    .onboarding-slide { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; opacity: 0; transform: translateX(100%); transition: all 0.4s ease; }
-    .onboarding-slide.active { opacity: 1; transform: translateX(0); }
-    .onboarding-slide.prev { opacity: 0; transform: translateX(-100%); }
-    .onboarding-icon { width: 160px; height: 160px; margin-bottom: 40px; background: var(--bg2); border-radius: 40px; display: flex; align-items: center; justify-content: center; font-size: 64px; border: 1px solid var(--border); }
-    .onboarding-title { font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 16px; line-height: 1.3; }
-    .onboarding-desc { font-size: 15px; color: var(--gray2); text-align: center; line-height: 1.7; }
-    .onboarding-dots { display: flex; gap: 8px; justify-content: center; padding: 24px; }
-    .onboarding-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--gray4); transition: all 0.3s; }
-    .onboarding-dot.active { width: 24px; background: var(--orange); }
-    .onboarding-bottom { padding: 0 24px 48px; display: flex; flex-direction: column; gap: 12px; }
-    .btn-primary { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 0.1s; font-family: inherit; }
-    .btn-primary:active { transform: scale(0.98); }
-    .btn-ghost { width: 100%; padding: 14px; background: none; color: var(--gray2); border: none; font-size: 14px; cursor: pointer; font-family: inherit; }
-
-    /* ── 로그인 ── */
-    #login { background: var(--bg); align-items: center; justify-content: flex-end; padding: 0; position: relative; overflow: hidden; min-height: 100vh; width: 100%; }
-    .login-bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('onboarding1.png'); background-size: cover; background-position: center top; }
-    .login-overlay { position: absolute; bottom: 0; left: 0; right: 0; height: 55%; background: linear-gradient(to bottom, transparent, rgba(15,15,16,0.97) 50%, #0F0F10 100%); }
-    .login-top { display: none; }
-    .login-bottom { position: relative; z-index: 2; width: 100%; display: flex; flex-direction: column; gap: 12px; padding: 0 32px 60px; }
-    .btn-google { width: 100%; padding: 16px; background: var(--bg2); color: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; }
-    .login-terms { font-size: 12px; color: var(--gray3); text-align: center; line-height: 1.6; }
-
-    /* ── 공통 앱 레이아웃 ── */
-    #app { background: var(--bg); flex-direction: column; }
-    .app-header { display: flex; align-items: center; justify-content: space-between; padding: 52px 20px 16px; }
-    .header-logo { font-size: 22px; font-weight: 800; }
-    .header-logo span { color: var(--orange); }
-    .app-content { flex: 1; overflow-y: auto; padding: 0 20px 90px; -webkit-overflow-scrolling: touch; }
-    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); border-top: 1px solid var(--border); display: flex; padding: 8px 0 env(safe-area-inset-bottom, 16px); z-index: 50; }
-    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 4px 0; }
-    .tab-icon { font-size: 22px; opacity: 0.4; transition: all 0.2s; }
-    .tab-label { font-size: 10px; color: var(--gray3); font-weight: 500; transition: all 0.2s; }
-    .tab-item.active .tab-icon { opacity: 1; }
-    .tab-item.active .tab-label { color: var(--orange); }
-
-    /* ── 홈 탭 ── */
-    .home-greeting { margin-bottom: 24px; }
-    .home-greeting h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-    .home-greeting p { font-size: 14px; color: var(--gray2); }
-    .extract-card { background: var(--bg2); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; }
-    .extract-input-wrap { display: flex; gap: 10px; margin-bottom: 12px; }
-    .extract-input { flex: 1; min-width: 0; padding: 14px 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--white); font-size: 14px; outline: none; font-family: inherit; }
-    .extract-input::placeholder { color: var(--gray3); }
-    .extract-input:focus { border-color: var(--orange); }
-    .btn-extract { padding: 14px 16px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: inherit; flex-shrink: 0; }
-    .btn-extract:disabled { background: var(--gray4); cursor: not-allowed; }
-    .btn-image { width: 100%; padding: 13px; background: var(--bg3); color: var(--gray2); border: 1px dashed var(--border); border-radius: var(--radius-sm); font-size: 14px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .section-title { font-size: 16px; font-weight: 700; }
-    .history-item { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-    .history-thumb { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; background: var(--bg3); flex-shrink: 0; }
-    .history-thumb-placeholder { width: 60px; height: 60px; border-radius: 10px; background: var(--bg3); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
-    .history-info { flex: 1; min-width: 0; }
-    .history-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .history-meta { font-size: 12px; color: var(--gray3); }
-    .history-empty { text-align: center; padding: 40px 0; color: var(--gray3); font-size: 14px; line-height: 1.6; }
-
-    /* ── 추출 중 ── */
-    #loading-screen { background: var(--bg); align-items: center; justify-content: center; flex-direction: column; gap: 28px; padding: 40px 24px; }
-    .loading-title-text { font-size: 22px; font-weight: 700; text-align: center; }
-    .loading-sub-text { font-size: 14px; color: var(--gray2); text-align: center; margin-top: -20px; }
-    .circle-progress { position: relative; width: 160px; height: 160px; flex-shrink: 0; }
-    .circle-progress svg { transform: rotate(-90deg); }
-    .circle-bg { fill: none; stroke: var(--bg3); stroke-width: 8; }
-    .circle-fill { fill: none; stroke: var(--orange); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 440; stroke-dashoffset: 440; transition: stroke-dashoffset 0.8s ease; }
-    .circle-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
-    .circle-percent { font-size: 32px; font-weight: 800; color: var(--orange); }
-    .circle-label { font-size: 11px; color: var(--gray2); }
-    .loading-steps-list { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 10px; }
-    .loading-step-item { display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: var(--gray3); }
-    .loading-step-item.done { color: var(--orange); }
-    .loading-step-item.active { color: var(--white); font-weight: 600; }
-    .step-left { display: flex; align-items: center; gap: 10px; }
-    .step-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--bg3); display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
-    .step-dot.done { background: var(--orange); }
-    .step-dot.active { border: 2px solid var(--orange); background: transparent; }
-    .step-time { font-size: 12px; color: var(--gray3); }
-    .loading-error-box { background: rgba(255,59,48,0.1); border: 1px solid rgba(255,59,48,0.3); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 320px; }
-    .loading-error-title { font-size: 16px; font-weight: 700; color: var(--red); margin-bottom: 12px; }
-    .loading-error-reasons { font-size: 13px; color: var(--gray2); line-height: 1.8; }
-    .btn-cancel { padding: 12px 32px; background: var(--bg2); color: var(--gray2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: inherit; }
-    .btn-retry { padding: 12px 32px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
-
-    /* ── 추출 결과 ── */
-    .result-header { display: flex; align-items: center; gap: 12px; padding: 52px 20px 16px; }
-    .back-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--bg2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--white); font-size: 18px; flex-shrink: 0; }
-    .result-recipe-tabs { display: flex; gap: 8px; padding: 0 20px 16px; overflow-x: auto; }
-    .result-recipe-tabs::-webkit-scrollbar { display: none; }
-    .rtab { padding: 8px 18px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg2); color: var(--gray2); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; font-family: inherit; }
-    .rtab.active { background: var(--orange); color: #fff; border-color: var(--orange); }
-    .result-content { padding: 0 20px 100px; }
-    .result-thumb-wrap { position: relative; margin-bottom: 20px; border-radius: var(--radius); overflow: hidden; }
-    .result-thumb { width: 100%; height: 200px; object-fit: cover; display: block; }
-    .result-yt-btn { position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.7); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; text-decoration: none; }
-    .result-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
-    .result-desc { font-size: 14px; color: var(--gray2); margin-bottom: 20px; line-height: 1.6; }
-    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-    .meta-box { background: var(--bg2); border-radius: var(--radius-sm); padding: 14px 16px; border: 1px solid var(--border); }
-    .meta-box-label { font-size: 11px; color: var(--gray3); margin-bottom: 6px; }
-    .meta-box-value { font-size: 15px; font-weight: 700; }
-    .servings-control { display: flex; align-items: center; gap: 10px; }
-    .srv-btn { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--orange); background: transparent; color: var(--orange); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 700; line-height: 1; flex-shrink: 0; }
-    .nutrition-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 20px; }
-    .nut-box { background: var(--bg2); border-radius: var(--radius-sm); padding: 10px 6px; text-align: center; border: 1px solid var(--border); }
-    .nut-label { font-size: 10px; color: var(--gray3); margin-bottom: 4px; }
-    .nut-value { font-size: 13px; font-weight: 700; color: var(--orange); }
-    .content-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-    .ctab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 600; color: var(--gray3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
-    .ctab.active { color: var(--orange); border-bottom-color: var(--orange); }
-    .ingredient-row { display: flex; justify-content: space-between; font-size: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-    .ingredient-name { color: var(--white); }
-    .ingredient-amount { color: var(--gray2); }
-    .step-row2 { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
-    .step-num2 { min-width: 28px; height: 28px; border-radius: 50%; background: var(--orange); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-    .step-text2 { font-size: 14px; line-height: 1.7; color: var(--gray1); padding-top: 4px; }
-    .method-tag { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-bottom: 16px; }
-    .tag-gemini { background: rgba(52,168,83,0.15); color: #4CAF50; }
-    .tag-transcript { background: rgba(255,138,0,0.15); color: var(--orange); }
-    .result-actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
-    .btn-save { flex: 1; min-width: 100px; padding: 15px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
-    .btn-save:disabled { background: var(--gray4); cursor: not-allowed; }
-    .btn-copy { flex: 1; min-width: 100px; padding: 15px; background: var(--bg2); color: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
-    .save-category { width: 100%; padding: 13px 15px; background: var(--bg2); color: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: inherit; outline: none; }
-
-    /* ── 보관함 탭 ── */
-    .vault-header { padding: 52px 20px 16px; }
-    .vault-search { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 16px; }
-    .vault-search input { flex: 1; background: none; border: none; color: var(--white); font-size: 14px; outline: none; font-family: inherit; min-width: 0; }
-    .vault-search input::placeholder { color: var(--gray3); }
-    .cat-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 16px; }
-    .cat-scroll::-webkit-scrollbar { display: none; }
-    .cat-chip { padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg2); color: var(--gray2); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; font-family: inherit; flex-shrink: 0; }
-    .cat-chip.active { background: var(--orange); color: #fff; border-color: var(--orange); }
-    .vault-list { display: flex; flex-direction: column; gap: 12px; padding: 0 20px 90px; }
-    .vault-item { display: flex; gap: 14px; background: var(--bg2); border-radius: var(--radius); padding: 14px; border: 1px solid var(--border); cursor: pointer; position: relative; }
-    .vault-thumb { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--bg3); }
-    .vault-thumb-placeholder { width: 80px; height: 80px; border-radius: 10px; background: var(--bg3); display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
-    .vault-info { flex: 1; min-width: 0; }
-    .vault-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .vault-meta { font-size: 12px; color: var(--gray3); margin-bottom: 8px; }
-    .vault-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-    .vault-tag { padding: 2px 8px; border-radius: 6px; background: var(--bg3); color: var(--gray2); font-size: 11px; }
-    .vault-fav { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; }
-    .vault-empty { text-align: center; padding: 60px 20px; color: var(--gray3); }
-    .vault-empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .vault-empty-title { font-size: 16px; font-weight: 600; color: var(--gray2); margin-bottom: 6px; }
-
-    /* ── 레시피 상세 시트 ── */
-    .detail-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
-    .detail-sheet { background: var(--bg); border-radius: 24px 24px 0 0; width: 100%; max-width: 700px; max-height: 92vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 24px); -webkit-overflow-scrolling: touch; }
-    .detail-handle { width: 40px; height: 4px; background: var(--bg3); border-radius: 2px; margin: 12px auto 0; }
-    .detail-sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
-    .detail-close { width: 32px; height: 32px; border-radius: 50%; background: var(--bg2); border: none; cursor: pointer; color: var(--white); font-size: 16px; display: flex; align-items: center; justify-content: center; }
-    .detail-body { padding: 0 20px 20px; }
-    .detail-thumb-wrap { position: relative; margin-bottom: 20px; border-radius: var(--radius); overflow: hidden; }
-    .detail-thumb { width: 100%; height: 200px; object-fit: cover; }
-    .detail-yt-btn { position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.7); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; text-decoration: none; }
-    .detail-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
-    .detail-desc { font-size: 14px; color: var(--gray2); margin-bottom: 20px; line-height: 1.6; }
-    .detail-actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
-    .btn-detail-edit { flex: 1; min-width: 80px; padding: 13px; background: var(--bg2); color: var(--orange); border: 1px solid var(--orange); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-    .btn-detail-copy { flex: 1; min-width: 80px; padding: 13px; background: var(--bg2); color: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-    .btn-detail-yt { flex: 1; min-width: 80px; padding: 13px; background: var(--bg2); color: var(--white); border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; display: flex; align-items: center; justify-content: center; }
-    .btn-delete { width: 100%; padding: 13px; background: rgba(255,59,48,0.1); color: var(--red); border: 1px solid rgba(255,59,48,0.2); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 8px; }
-    .edit-input { width: 100%; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--white); font-size: 14px; outline: none; font-family: inherit; margin-top: 4px; }
-    .edit-input:focus { border-color: var(--orange); }
-    .edit-label { font-size: 11px; color: var(--gray3); }
-    .edit-textarea { width: 100%; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--white); font-size: 14px; outline: none; font-family: inherit; resize: vertical; line-height: 1.6; }
-    .btn-add-row { width: 100%; padding: 10px; background: transparent; border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--orange); font-size: 14px; cursor: pointer; font-family: inherit; margin-top: 8px; }
-    .btn-remove-row { padding: 4px 8px; background: rgba(255,59,48,0.15); color: var(--red); border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
-    .btn-edit-done { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 16px; }
-    .btn-edit-cancel { width: 100%; padding: 12px; background: var(--bg2); color: var(--gray2); border: none; border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: inherit; margin-top: 8px; }
-
-    /* ── 설정 탭 ── */
-    .settings-header { padding: 52px 20px 24px; }
-    .settings-title { font-size: 24px; font-weight: 800; }
-    .settings-content { padding: 0 20px 90px; display: flex; flex-direction: column; gap: 8px; }
-    .settings-section-label { font-size: 12px; color: var(--gray3); font-weight: 600; padding: 8px 0 4px; }
-    .settings-item { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border-radius: var(--radius-sm); padding: 16px; border: 1px solid var(--border); }
-    .settings-item-left { display: flex; align-items: center; gap: 12px; }
-    .settings-item-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-    .settings-item-title { font-size: 15px; font-weight: 600; }
-    .settings-item-value { font-size: 13px; color: var(--gray3); }
-    .settings-user { background: var(--bg2); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
-    .settings-avatar { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--orange), var(--orange2)); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex-shrink: 0; }
-    .settings-user-name { font-size: 16px; font-weight: 700; }
-    .settings-user-email { font-size: 13px; color: var(--gray3); }
-    .btn-logout { width: 100%; padding: 15px; background: rgba(255,59,48,0.1); color: var(--red); border: 1px solid rgba(255,59,48,0.2); border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 8px; }
-
-    /* ── 토스트 ── */
-    .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--bg2); color: var(--white); padding: 12px 20px; border-radius: var(--radius-sm); font-size: 14px; border: 1px solid var(--border); z-index: 200; white-space: nowrap; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 90vw; text-align: center; }
-    .toast.show { opacity: 1; }
-    .toast.error { border-color: var(--red); color: var(--red); }
-    .toast.success { border-color: #34C759; color: #34C759; }
-
-    .divider { height: 1px; background: var(--border); margin: 16px 0; }
-    .hidden { display: none !important; }
-
-    /* ── 별점/후기/메모 ── */
-    .rating-section { margin: 16px 0; }
-    .rating-label { font-size: 13px; color: var(--gray2); margin-bottom: 8px; font-weight: 600; }
-    .star-row { display: flex; gap: 8px; margin-bottom: 4px; }
-    .star { font-size: 28px; cursor: pointer; opacity: 0.3; transition: opacity 0.15s, transform 0.15s; }
-    .star.active { opacity: 1; }
-    .star:active { transform: scale(1.2); }
-    .rating-textarea { width: 100%; padding: 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--white); font-size: 14px; outline: none; font-family: inherit; resize: none; line-height: 1.6; margin-top: 8px; }
-    .rating-textarea:focus { border-color: var(--orange); }
-    .btn-rating-save { width: 100%; padding: 13px; background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 10px; }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    body { font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--white); min-height:100vh; overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+    .screen { display:none; min-height:100vh; flex-direction:column; }
+    .screen.active { display:flex; }
+    /* 스플래시 */
+    #splash { background:var(--bg); align-items:center; justify-content:center; }
+    .splash-logo { display:flex; flex-direction:column; align-items:center; animation:fadeIn 0.8s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    /* 온보딩 */
+    #onboarding { background:var(--bg); }
+    .onboarding-slides { flex:1; overflow:hidden; position:relative; }
+    .onboarding-slide { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 32px; opacity:0; transform:translateX(100%); transition:all 0.4s ease; }
+    .onboarding-slide.active { opacity:1; transform:translateX(0); }
+    .onboarding-slide.prev { opacity:0; transform:translateX(-100%); }
+    .onboarding-icon { width:160px; height:160px; margin-bottom:40px; background:var(--bg2); border-radius:40px; display:flex; align-items:center; justify-content:center; font-size:64px; border:1px solid var(--border); }
+    .onboarding-title { font-size:26px; font-weight:800; text-align:center; margin-bottom:16px; line-height:1.3; }
+    .onboarding-desc { font-size:15px; color:var(--gray2); text-align:center; line-height:1.7; }
+    .onboarding-dots { display:flex; gap:8px; justify-content:center; padding:24px; }
+    .onboarding-dot { width:8px; height:8px; border-radius:4px; background:var(--gray4); transition:all 0.3s; }
+    .onboarding-dot.active { width:24px; background:var(--orange); }
+    .onboarding-bottom { padding:0 24px 48px; display:flex; flex-direction:column; gap:12px; }
+    .btn-primary { width:100%; padding:16px; background:linear-gradient(135deg,var(--orange),var(--orange2)); color:#fff; border:none; border-radius:var(--radius); font-size:16px; font-weight:700; cursor:pointer; transition:transform 0.1s; font-family:inherit; }
+    .btn-primary:active { transform:scale(0.98); }
+    .btn-ghost { width:100%; padding:14px; background:none; color:var(--gray2); border:none; font-size:14px; cursor:pointer; font-family:inherit; }
+    /* 로그인 */
+    #login { background:var(--bg); align-items:center; justify-content:flex-end; padding:0; position:relative; overflow:hidden; min-height:100vh; width:100%; }
+    .login-bg { position:absolute; top:0; left:0; right:0; bottom:0; background-image:url('onboarding1.png'); background-size:cover; background-position:center top; }
+    .login-overlay { position:absolute; bottom:0; left:0; right:0; height:55%; background:linear-gradient(to bottom,transparent,rgba(15,15,16,0.97) 50%,#0F0F10 100%); }
+    .login-bottom { position:relative; z-index:2; width:100%; display:flex; flex-direction:column; gap:12px; padding:0 32px 60px; }
+    .btn-google { width:100%; padding:16px; background:var(--bg2); color:var(--white); border:1px solid var(--border); border-radius:var(--radius); font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; font-family:inherit; }
+    .login-terms { font-size:12px; color:var(--gray3); text-align:center; line-height:1.6; }
+    /* 앱 레이아웃 */
+    #app { background:var(--bg); flex-direction:column; }
+    .app-header { display:flex; align-items:center; justify-content:space-between; padding:52px 20px 16px; }
+    .header-logo { font-size:22px; font-weight:800; }
+    .header-logo span { color:var(--orange); }
+    .app-content { flex:1; overflow-y:auto; padding:0 20px 90px; -webkit-overflow-scrolling:touch; }
+    .tab-bar { position:fixed; bottom:0; left:0; right:0; background:var(--bg2); border-top:1px solid var(--border); display:flex; padding:8px 0 env(safe-area-inset-bottom,16px); z-index:50; }
+    .tab-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; padding:4px 0; }
+    .tab-icon { font-size:22px; opacity:0.4; transition:all 0.2s; }
+    .tab-label { font-size:10px; color:var(--gray3); font-weight:500; transition:all 0.2s; }
+    .tab-item.active .tab-icon { opacity:1; }
+    .tab-item.active .tab-label { color:var(--orange); }
+    /* 홈 */
+    .home-greeting { margin-bottom:24px; }
+    .home-greeting h2 { font-size:22px; font-weight:700; margin-bottom:4px; }
+    .home-greeting p { font-size:14px; color:var(--gray2); }
+    .extract-card { background:var(--bg2); border-radius:var(--radius); padding:20px; border:1px solid var(--border); margin-bottom:24px; }
+    .extract-input-wrap { display:flex; gap:10px; margin-bottom:12px; }
+    .extract-input { flex:1; min-width:0; padding:14px 16px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--white); font-size:14px; outline:none; font-family:inherit; }
+    .extract-input::placeholder { color:var(--gray3); }
+    .extract-input:focus { border-color:var(--orange); }
+    .btn-extract { padding:14px 16px; background:linear-gradient(135deg,var(--orange),var(--orange2)); color:#fff; border:none; border-radius:var(--radius-sm); font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:inherit; flex-shrink:0; }
+    .btn-extract:disabled { background:var(--gray4); cursor:not-allowed; }
+    .btn-image { width:100%; padding:13px; background:var(--bg3); color:var(--gray2); border:1px dashed var(--border); border-radius:var(--radius-sm); font-size:14px; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    .section-title { font-size:16px; font-weight:700; }
+    .history-item { display:flex; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+    .history-thumb { width:60px; height:60px; border-radius:10px; object-fit:cover; background:var(--bg3); flex-shrink:0; }
+    .history-thumb-placeholder { width:60px; height:60px; border-radius:10px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
+    .history-info { flex:1; min-width:0; }
+    .history-title { font-size:14px; font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .history-meta { font-size:12px; color:var(--gray3); }
+    .history-empty { text-align:center; padding:40px 0; color:var(--gray3); font-size:14px; line-height:1.6; }
+    /* 로딩 */
+    #loading-screen { background:var(--bg); align-items:center; justify-content:center; flex-direction:column; gap:28px; padding:40px 24px; }
+    .loading-title-text { font-size:22px; font-weight:700; text-align:center; }
+    .loading-sub-text { font-size:14px; color:var(--gray2); text-align:center; margin-top:-20px; }
+    .circle-progress { position:relative; width:160px; height:160px; flex-shrink:0; }
+    .circle-progress svg { transform:rotate(-90deg); }
+    .circle-bg { fill:none; stroke:var(--bg3); stroke-width:8; }
+    .circle-fill { fill:none; stroke:var(--orange); stroke-width:8; stroke-linecap:round; stroke-dasharray:440; stroke-dashoffset:440; transition:stroke-dashoffset 0.8s ease; }
+    .circle-text { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+    .circle-percent { font-size:32px; font-weight:800; color:var(--orange); }
+    .circle-label { font-size:11px; color:var(--gray2); }
+    .loading-steps-list { width:100%; max-width:320px; display:flex; flex-direction:column; gap:10px; }
+    .loading-step-item { display:flex; align-items:center; justify-content:space-between; font-size:14px; color:var(--gray3); }
+    .loading-step-item.done { color:var(--orange); }
+    .loading-step-item.active { color:var(--white); font-weight:600; }
+    .step-left { display:flex; align-items:center; gap:10px; }
+    .step-dot { width:20px; height:20px; border-radius:50%; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0; }
+    .step-dot.done { background:var(--orange); }
+    .step-dot.active { border:2px solid var(--orange); background:transparent; }
+    .step-time { font-size:12px; color:var(--gray3); }
+    .loading-error-box { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.3); border-radius:var(--radius); padding:20px; width:100%; max-width:320px; }
+    .loading-error-title { font-size:16px; font-weight:700; color:var(--red); margin-bottom:12px; }
+    .loading-error-reasons { font-size:13px; color:var(--gray2); line-height:1.8; }
+    .btn-cancel { padding:12px 32px; background:var(--bg2); color:var(--gray2); border:1px solid var(--border); border-radius:var(--radius); font-size:14px; cursor:pointer; font-family:inherit; }
+    .btn-retry { padding:12px 32px; background:linear-gradient(135deg,var(--orange),var(--orange2)); color:#fff; border:none; border-radius:var(--radius); font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+    /* 결과 */
+    .result-header { display:flex; align-items:center; gap:12px; padding:52px 20px 16px; }
+    .back-btn { width:36px; height:36px; border-radius:50%; background:var(--bg2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--white); font-size:18px; flex-shrink:0; }
+    .result-recipe-tabs { display:flex; gap:8px; padding:0 20px 16px; overflow-x:auto; }
+    .result-recipe-tabs::-webkit-scrollbar { display:none; }
+    .rtab { padding:8px 18px; border-radius:20px; border:1px solid var(--border); background:var(--bg2); color:var(--gray2); font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; font-family:inherit; }
+    .rtab.active { background:var(--orange); color:#fff; border-color:var(--orange); }
+    .result-content { padding:0 20px 100px; }
+    .result-thumb-wrap { position:relative; margin-bottom:20px; border-radius:var(--radius); overflow:hidden; }
+    .result-thumb { width:100%; height:200px; object-fit:cover; display:block; }
+    .result-yt-btn { position:absolute; bottom:12px; right:12px; background:rgba(0,0,0,0.7); color:#fff; padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; }
+    .result-title { font-size:22px; font-weight:800; margin-bottom:6px; }
+    .result-desc { font-size:14px; color:var(--gray2); margin-bottom:20px; line-height:1.6; }
+    .meta-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
+    .meta-box { background:var(--bg2); border-radius:var(--radius-sm); padding:14px 16px; border:1px solid var(--border); }
+    .meta-box-label { font-size:11px; color:var(--gray3); margin-bottom:6px; }
+    .meta-box-value { font-size:15px; font-weight:700; }
+    .servings-control { display:flex; align-items:center; gap:10px; }
+    .srv-btn { width:28px; height:28px; border-radius:50%; border:1.5px solid var(--orange); background:transparent; color:var(--orange); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:700; line-height:1; flex-shrink:0; }
+    .nutrition-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:20px; }
+    .nut-box { background:var(--bg2); border-radius:var(--radius-sm); padding:10px 6px; text-align:center; border:1px solid var(--border); }
+    .nut-label { font-size:10px; color:var(--gray3); margin-bottom:4px; }
+    .nut-value { font-size:13px; font-weight:700; color:var(--orange); }
+    .content-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:20px; }
+    .ctab { flex:1; padding:12px; text-align:center; font-size:14px; font-weight:600; color:var(--gray3); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; }
+    .ctab.active { color:var(--orange); border-bottom-color:var(--orange); }
+    .ingredient-row { display:flex; justify-content:space-between; font-size:14px; padding:10px 0; border-bottom:1px solid var(--border); }
+    .ingredient-name { color:var(--white); }
+    .ingredient-amount { color:var(--gray2); }
+    .step-row2 { display:flex; gap:14px; margin-bottom:16px; align-items:flex-start; }
+    .step-num2 { min-width:28px; height:28px; border-radius:50%; background:var(--orange); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+    .step-text2 { font-size:14px; line-height:1.7; color:var(--gray1); padding-top:4px; }
+    .method-tag { display:inline-block; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; margin-bottom:16px; }
+    .tag-gemini { background:rgba(52,168,83,0.15); color:#4CAF50; }
+    .tag-transcript { background:rgba(255,138,0,0.15); color:var(--orange); }
+    .btn-save { flex:1; min-width:100px; padding:15px; background:linear-gradient(135deg,var(--orange),var(--orange2)); color:#fff; border:none; border-radius:var(--radius); font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+    .btn-save:disabled { background:var(--gray4); cursor:not-allowed; }
+    .btn-copy { flex:1; min-width:100px; padding:15px; background:var(--bg2); color:var(--white); border:1px solid var(--border); border-radius:var(--radius); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .save-category { width:100%; padding:13px 15px; background:var(--bg2); color:var(--white); border:1px solid var(--border); border-radius:var(--radius); font-size:14px; cursor:pointer; font-family:inherit; outline:none; }
+    /* 보관함 */
+    .vault-header { padding:52px 20px 16px; }
+    .vault-search { display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:16px; }
+    .vault-search input { flex:1; background:none; border:none; color:var(--white); font-size:14px; outline:none; font-family:inherit; min-width:0; }
+    .vault-search input::placeholder { color:var(--gray3); }
+    .cat-scroll { display:flex; gap:8px; overflow-x:auto; padding-bottom:16px; }
+    .cat-scroll::-webkit-scrollbar { display:none; }
+    .cat-chip { padding:7px 16px; border-radius:20px; border:1px solid var(--border); background:var(--bg2); color:var(--gray2); font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; font-family:inherit; flex-shrink:0; }
+    .cat-chip.active { background:var(--orange); color:#fff; border-color:var(--orange); }
+    .vault-list { display:flex; flex-direction:column; gap:12px; padding:0 20px 90px; }
+    .vault-item { display:flex; gap:14px; background:var(--bg2); border-radius:var(--radius); padding:14px; border:1px solid var(--border); cursor:pointer; position:relative; }
+    .vault-thumb { width:80px; height:80px; border-radius:10px; object-fit:cover; flex-shrink:0; background:var(--bg3); }
+    .vault-thumb-placeholder { width:80px; height:80px; border-radius:10px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+    .vault-info { flex:1; min-width:0; }
+    .vault-title { font-size:15px; font-weight:700; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .vault-meta { font-size:12px; color:var(--gray3); margin-bottom:8px; }
+    .vault-tags { display:flex; gap:6px; flex-wrap:wrap; }
+    .vault-tag { padding:2px 8px; border-radius:6px; background:var(--bg3); color:var(--gray2); font-size:11px; }
+    .vault-fav { position:absolute; top:12px; right:12px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; }
+    .vault-empty { text-align:center; padding:60px 20px; color:var(--gray3); }
+    .vault-empty-icon { font-size:48px; margin-bottom:12px; }
+    .vault-empty-title { font-size:16px; font-weight:600; color:var(--gray2); margin-bottom:6px; }
+    /* 상세 시트 */
+    .detail-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:100; display:none; align-items:flex-end; justify-content:center; }
+    .detail-sheet { background:var(--bg); border-radius:24px 24px 0 0; width:100%; max-width:700px; max-height:92vh; overflow-y:auto; padding-bottom:env(safe-area-inset-bottom,24px); -webkit-overflow-scrolling:touch; }
+    .detail-handle { width:40px; height:4px; background:var(--bg3); border-radius:2px; margin:12px auto 0; }
+    .detail-sheet-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; }
+    .detail-close { width:32px; height:32px; border-radius:50%; background:var(--bg2); border:none; cursor:pointer; color:var(--white); font-size:16px; display:flex; align-items:center; justify-content:center; }
+    .detail-body { padding:0 20px 20px; }
+    .detail-thumb-wrap { position:relative; margin-bottom:20px; border-radius:var(--radius); overflow:hidden; }
+    .detail-thumb { width:100%; height:200px; object-fit:cover; }
+    .detail-yt-btn { position:absolute; bottom:12px; right:12px; background:rgba(0,0,0,0.7); color:#fff; padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; }
+    .detail-title { font-size:22px; font-weight:800; margin-bottom:6px; }
+    .detail-desc { font-size:14px; color:var(--gray2); margin-bottom:20px; line-height:1.6; }
+    .detail-actions { display:flex; gap:8px; margin-top:20px; flex-wrap:wrap; }
+    .btn-detail-edit { flex:1; min-width:80px; padding:13px; background:var(--bg2); color:var(--orange); border:1px solid var(--orange); border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-detail-copy { flex:1; min-width:80px; padding:13px; background:var(--bg2); color:var(--white); border:1px solid var(--border); border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-detail-yt { flex:1; min-width:80px; padding:13px; background:var(--bg2); color:var(--white); border:1px solid var(--border); border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; text-decoration:none; display:flex; align-items:center; justify-content:center; }
+    .btn-delete { width:100%; padding:13px; background:rgba(255,59,48,0.1); color:var(--red); border:1px solid rgba(255,59,48,0.2); border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px; }
+    .edit-input { width:100%; padding:10px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--white); font-size:14px; outline:none; font-family:inherit; margin-top:4px; }
+    .edit-input:focus { border-color:var(--orange); }
+    .edit-label { font-size:11px; color:var(--gray3); }
+    .edit-textarea { width:100%; padding:10px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--white); font-size:14px; outline:none; font-family:inherit; resize:vertical; line-height:1.6; }
+    .btn-add-row { width:100%; padding:10px; background:transparent; border:1px dashed var(--border); border-radius:var(--radius-sm); color:var(--orange); font-size:14px; cursor:pointer; font-family:inherit; margin-top:8px; }
+    .btn-remove-row { padding:4px 8px; background:rgba(255,59,48,0.15); color:var(--red); border:none; border-radius:6px; font-size:12px; cursor:pointer; }
+    .btn-edit-done { width:100%; padding:14px; background:linear-gradient(135deg,var(--orange),var(--orange2)); color:#fff; border:none; border-radius:var(--radius); font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:16px; }
+    .btn-edit-cancel { width:100%; padding:12px; background:var(--bg2); color:var(--gray2); border:none; border-radius:var(--radius); font-size:14px; cursor:pointer; font-family:inherit; margin-top:8px; }
+    /* 설정 */
+    .settings-header { padding:52px 20px 24px; }
+    .settings-title { font-size:24px; font-weight:800; }
+    .settings-content { padding:0 20px 90px; display:flex; flex-direction:column; gap:8px; }
+    .settings-section-label { font-size:12px; color:var(--gray3); font-weight:600; padding:8px 0 4px; }
+    .settings-item { display:flex; align-items:center; justify-content:space-between; background:var(--bg2); border-radius:var(--radius-sm); padding:16px; border:1px solid var(--border); }
+    .settings-item-left { display:flex; align-items:center; gap:12px; }
+    .settings-item-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .settings-item-title { font-size:15px; font-weight:600; }
+    .settings-item-value { font-size:13px; color:var(--gray3); }
+    .settings-user { background:var(--bg2); border-radius:var(--radius); padding:20px; border:1px solid var(--border); display:flex; align-items:center; gap:14px; margin-bottom:8px; }
+    .settings-avatar { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--orange2)); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; flex-shrink:0; }
+    .settings-user-name { font-size:16px; font-weight:700; }
+    .settings-user-email { font-size:13px; color:var(--gray3); }
+    .btn-logout { width:100%; padding:15px; background:rgba(255,59,48,0.1); color:var(--red); border:1px solid rgba(255,59,48,0.2); border-radius:var(--radius); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px; }
+    /* 토스트 */
+    .toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:var(--bg2); color:var(--white); padding:12px 20px; border-radius:var(--radius-sm); font-size:14px; border:1px solid var(--border); z-index:200; white-space:nowrap; opacity:0; transition:opacity 0.3s; pointer-events:none; max-width:90vw; text-align:center; }
+    .toast.show { opacity:1; }
+    .toast.error { border-color:var(--red); color:var(--red); }
+    .toast.success { border-color:#34C759; color:#34C759; }
+    .divider { height:1px; background:var(--border); margin:16px 0; }
+    .hidden { display:none !important; }
+    /* 별점/후기/메모 */
+    .rating-section { padding:0 20px 20px; }
+    .rating-label { font-size:13px; color:var(--gray2); margin-bottom:8px; font-weight:600; }
+    .star-row { display:flex; gap:8px; margin-bottom:4px; }
+    .star { font-size:28px; cursor:pointer; opacity:0.3; transition:opacity 0.15s,transform 0.15s; }
+    .star.active { opacity:1; }
+    .star:active { transform:scale(1.2); }
+    .rating-textarea { width:100%; padding:12px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--white); font-size:14px; outline:none; font-family:inherit; resize:none; line-height:1.6; margin-top:8px; }
+    .rating-textarea:focus { border-color:var(--orange); }
+    .btn-rating-save { width:100%; padding:13px; background:linear-gradient(135deg,var(--orange),var(--orange2)); color:#fff; border:none; border-radius:var(--radius); font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:10px; }
   </style>
 </head>
 <body>
 
 <!-- 스플래시 -->
-  <div id="splash" class="screen active">
+<div id="splash" class="screen active">
   <div class="splash-logo">
-    <img src="/logo.png" style="width:120px;height:120px;object-fit:contain;margin-bottom:16px">
-    <div class="splash-title">레시피<span>X</span></div>
-    <div class="splash-subtitle">영상 속 레시피를 추출하고 정리하세요</div>
+    <img src="/logo.png" style="width:240px;height:240px;object-fit:contain;">
   </div>
 </div>
 
@@ -271,13 +241,13 @@
     </div>
     <div class="onboarding-slide" id="slide-1">
       <div class="onboarding-icon">🔍</div>
-      <div class="onboarding-title">정확한 레시피 추출</div>
-      <div class="onboarding-desc">음성, 자막, 화면 정보를 분석해<br>정확한 레시피를 추출합니다.</div>
+      <div class="onboarding-title">정확한 레시피 정리</div>
+      <div class="onboarding-desc">음성, 자막, 화면 정보를 분석해<br>정확한 레시피를 정리합니다.</div>
     </div>
     <div class="onboarding-slide" id="slide-2">
       <div class="onboarding-icon">📂</div>
       <div class="onboarding-title">나만의 레시피 보관함</div>
-      <div class="onboarding-desc">추출한 레시피를 카테고리별로<br>정리하고 관리하세요.</div>
+      <div class="onboarding-desc">정리된 레시피를 카테고리별로<br>저장하고 관리하세요.</div>
     </div>
   </div>
   <div class="onboarding-dots">
@@ -292,7 +262,7 @@
 </div>
 
 <!-- 로그인 -->
-  <div id="login" class="screen">
+<div id="login" class="screen">
   <div class="login-bg"></div>
   <div class="login-overlay"></div>
   <div class="login-bottom">
@@ -308,9 +278,7 @@
 <div id="app" class="screen">
   <!-- 홈 탭 -->
   <div id="tab-home" class="app-tab">
-    <div class="app-header">
-      <div class="header-logo">레시피<span>X</span></div>
-    </div>
+    <div class="app-header"><div class="header-logo">레시피<span>X</span></div></div>
     <div class="app-content">
       <div class="home-greeting">
         <h2 id="greeting-text">안녕하세요! 👋</h2>
@@ -321,27 +289,22 @@
           <input class="extract-input" id="youtube-url" placeholder="유튜브 URL 입력..." />
           <button class="btn-extract" id="extract-btn">분석 시작</button>
         </div>
-        <label for="image-input">
-          <div class="btn-image">📷 사진으로 레시피 찾기</div>
-        </label>
+        <label for="image-input"><div class="btn-image">📷 사진으로 레시피 찾기</div></label>
         <input type="file" accept="image/*" id="image-input" class="hidden" />
       </div>
-      <div class="section-header">
-        <div class="section-title">최근 분석 결과</div>
-      </div>
+      <div class="section-header"><div class="section-title">최근 분석 결과</div></div>
       <div id="history-list">
         <div class="history-empty">아직 분석한 레시피가 없어요 😊<br>위에서 영상 URL을 입력해보세요!</div>
       </div>
     </div>
   </div>
-
   <!-- 보관함 탭 -->
   <div id="tab-vault" class="app-tab hidden">
     <div class="vault-header">
       <div class="header-logo" style="margin-bottom:16px">보관함</div>
       <div class="vault-search">
         <span style="color:var(--gray3)">🔍</span>
-        <input id="search-input" placeholder="레시피 검색..." oninput="filterSearch(this.value)">
+        <input id="search-input" placeholder="레시피 검색...">
       </div>
       <div class="cat-scroll">
         <button class="cat-chip active" data-cat="전체">전체</button>
@@ -354,12 +317,9 @@
     </div>
     <div id="vault-list" class="vault-list"></div>
   </div>
-
   <!-- 설정 탭 -->
   <div id="tab-settings" class="app-tab hidden">
-    <div class="settings-header">
-      <div class="settings-title">설정</div>
-    </div>
+    <div class="settings-header"><div class="settings-title">설정</div></div>
     <div class="settings-content">
       <div class="settings-user">
         <div class="settings-avatar" id="settings-avatar">?</div>
@@ -385,16 +345,14 @@
             <div style="font-size:12px;color:var(--gray3);margin-top:2px">recipex.ai@gmail.com</div>
           </div>
         </div>
-        <div class="settings-item-arrow">›</div>
+        <span>›</span>
       </div>
       <div class="settings-item" onclick="window.open('https://shinni153.github.io/recipe-app/privacy.html','_blank')" style="cursor:pointer">
         <div class="settings-item-left">
           <div class="settings-item-icon" style="background:rgba(255,138,0,0.15)">🔒</div>
-          <div>
-            <div class="settings-item-title">개인정보처리방침</div>
-          </div>
+          <div><div class="settings-item-title">개인정보처리방침</div></div>
         </div>
-        <div class="settings-item-arrow">›</div>
+        <span>›</span>
       </div>
       <div class="settings-section-label">앱 정보</div>
       <div class="settings-item">
@@ -413,26 +371,16 @@
             <div style="font-size:12px;color:var(--gray3);margin-top:2px">탈퇴 시 모든 데이터가 즉시 삭제됩니다</div>
           </div>
         </div>
-        <div class="settings-item-arrow">›</div>
+        <span>›</span>
       </div>
       <button class="btn-logout" id="logout-btn">로그아웃</button>
     </div>
   </div>
-
-  <!-- 하단 탭바 -->
+  <!-- 탭바 -->
   <div class="tab-bar">
-    <div class="tab-item active" data-tab="home">
-      <div class="tab-icon">🏠</div>
-      <div class="tab-label">홈</div>
-    </div>
-    <div class="tab-item" data-tab="vault">
-      <div class="tab-icon">📂</div>
-      <div class="tab-label">보관함</div>
-    </div>
-    <div class="tab-item" data-tab="settings">
-      <div class="tab-icon">⚙️</div>
-      <div class="tab-label">설정</div>
-    </div>
+    <div class="tab-item active" data-tab="home"><div class="tab-icon">🏠</div><div class="tab-label">홈</div></div>
+    <div class="tab-item" data-tab="vault"><div class="tab-icon">📂</div><div class="tab-label">보관함</div></div>
+    <div class="tab-item" data-tab="settings"><div class="tab-icon">⚙️</div><div class="tab-label">설정</div></div>
   </div>
 </div>
 
@@ -451,33 +399,14 @@
     </div>
   </div>
   <div class="loading-steps-list">
-    <div class="loading-step-item" id="ls1">
-      <div class="step-left"><div class="step-dot" id="ld1">1</div>영상 정보 수집</div>
-      <div class="step-time" id="lt1"></div>
-    </div>
-    <div class="loading-step-item" id="ls2">
-      <div class="step-left"><div class="step-dot" id="ld2">2</div>음성 및 자막 분석</div>
-      <div class="step-time" id="lt2"></div>
-    </div>
-    <div class="loading-step-item" id="ls3">
-      <div class="step-left"><div class="step-dot" id="ld3">3</div>레시피 내용 추출</div>
-      <div class="step-time" id="lt3">예상 30초~2분</div>
-    </div>
-    <div class="loading-step-item" id="ls4">
-      <div class="step-left"><div class="step-dot" id="ld4">4</div>레시피 정리 및 구성</div>
-      <div class="step-time" id="lt4"></div>
-    </div>
+    <div class="loading-step-item" id="ls1"><div class="step-left"><div class="step-dot" id="ld1">1</div>영상 정보 수집</div><div class="step-time" id="lt1"></div></div>
+    <div class="loading-step-item" id="ls2"><div class="step-left"><div class="step-dot" id="ld2">2</div>음성 및 자막 분석</div><div class="step-time" id="lt2"></div></div>
+    <div class="loading-step-item" id="ls3"><div class="step-left"><div class="step-dot" id="ld3">3</div>레시피 내용 추출</div><div class="step-time" id="lt3">예상 30초~2분</div></div>
+    <div class="loading-step-item" id="ls4"><div class="step-left"><div class="step-dot" id="ld4">4</div>레시피 정리 및 구성</div><div class="step-time" id="lt4"></div></div>
   </div>
-  <!-- 에러 박스 (평소엔 hidden) -->
   <div id="loading-error-box" class="loading-error-box hidden">
     <div class="loading-error-title">😥 레시피 추출에 실패했어요</div>
-    <div class="loading-error-reasons" id="loading-error-msg">
-      · AI 서버가 일시적으로 바빠서일 수 있어요. 잠시 후 다시 시도해주세요!<br><br>
-      가능한 원인<br>
-      · 자막이 없는 영상<br>
-      · 비공개 또는 삭제된 영상<br>
-      · 지원하지 않는 형식
-    </div>
+    <div class="loading-error-reasons" id="loading-error-msg">· AI 서버가 일시적으로 바빠서일 수 있어요. 잠시 후 다시 시도해주세요!<br><br>가능한 원인<br>· 자막이 없는 영상<br>· 비공개 또는 삭제된 영상<br>· 지원하지 않는 형식</div>
   </div>
   <div style="display:flex;gap:12px">
     <button class="btn-cancel" id="cancel-btn">취소</button>
@@ -501,7 +430,7 @@
     </div>
     <div id="method-badge"></div>
     <div id="result-body"></div>
-    <div class="result-actions">
+    <div style="margin-top:16px">
       <select id="category-select" class="save-category">
         <option value="음식">🍽️ 음식</option>
         <option value="디저트">🍰 디저트</option>
@@ -544,7 +473,6 @@
   </div>
 </div>
 
-<!-- 토스트 -->
 <div class="toast" id="toast"></div>
 
 <script>
@@ -553,59 +481,63 @@
   const SERVER = "https://recipe-app-1wch.onrender.com";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  let currentUser = null;
-  let imageBase64 = null, imageMime = null;
-  let allRecipes = [], currentRecipeIdx = 0;
-  let currentUrl = "", currentThumbnail = "";
-  let loadingTimer = null, loadingTimer2 = null, progressTimer = null;
-  let allSavedRecipes = [];
-  let currentServings = 1, baseServings = 1, baseIngredients = [];
-  let extractServings = 1, extractBaseServings = 1, extractBaseIngredients = [];
-  let currentDetailTab = "ingredients";
-  let onboardingIdx = 0;
-  let lastUrl = "";
+  let currentUser=null, imageBase64=null, imageMime=null;
+  let allRecipes=[], currentRecipeIdx=0;
+  let currentUrl="", currentThumbnail="";
+  let loadingTimer=null, loadingTimer2=null, progressTimer=null;
+  let allSavedRecipes=[];
+  let currentServings=1, baseServings=1, baseIngredients=[];
+  let extractServings=1, extractBaseServings=1, extractBaseIngredients=[];
+  let currentDetailTab="ingredients", onboardingIdx=0, lastUrl="";
 
-  // ── 초기화 ──────────────────────────────────────────────────
   async function init() {
-    setTimeout(() => {
-    showScreen("login-check");
-  }, 2000);
+    setTimeout(() => showScreen("login-check"), 2000);
 
     const { data: { session } } = await sb.auth.getSession();
     if (session) currentUser = session.user;
 
     sb.auth.onAuthStateChange((event, session) => {
-     if (session) { currentUser = session.user; afterLogin(); showScreen("app"); }
-     else if (event === "SIGNED_OUT") { currentUser = null; showScreen("login"); }
+      if (session) { currentUser=session.user; afterLogin(); showScreen("app"); }
+      else if (event === "SIGNED_OUT") { currentUser=null; showScreen("login"); }
     });
 
     document.getElementById("google-login-btn").addEventListener("click", loginWithGoogle);
     document.getElementById("logout-btn").addEventListener("click", logout);
     document.getElementById("extract-btn").addEventListener("click", extractYoutube);
     document.getElementById("image-input").addEventListener("change", handleImage);
+    document.getElementById("search-input").addEventListener("input", e => filterSearch(e.target.value));
     document.getElementById("save-btn").addEventListener("click", saveRecipe);
     document.getElementById("copy-btn").addEventListener("click", copyRecipe);
     document.getElementById("result-back").addEventListener("click", () => showScreen("app"));
     document.getElementById("cancel-btn").addEventListener("click", () => { clearTimers(); showScreen("app"); });
-    document.getElementById("retry-btn").addEventListener("click", () => { document.getElementById("youtube-url").value = lastUrl; clearTimers(); showScreen("app"); setTimeout(extractYoutube, 300); });
+    document.getElementById("retry-btn").addEventListener("click", () => { document.getElementById("youtube-url").value=lastUrl; clearTimers(); showScreen("app"); setTimeout(extractYoutube,300); });
     document.getElementById("close-detail").addEventListener("click", closeDetail);
-    document.getElementById("detail-overlay").addEventListener("click", e => { if (e.target === document.getElementById("detail-overlay")) closeDetail(); });
+    document.getElementById("detail-overlay").addEventListener("click", e => { if(e.target===document.getElementById("detail-overlay")) closeDetail(); });
     document.getElementById("onboarding-next").addEventListener("click", nextSlide);
     document.getElementById("onboarding-skip").addEventListener("click", () => { localStorage.setItem("rx_onboarded","1"); showScreen("login-check"); });
+    document.getElementById("star-row").addEventListener("click", e => { if(e.target.classList.contains("star")) setStars(parseInt(e.target.dataset.v)); });
+    document.querySelectorAll(".tab-item").forEach(t => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+    document.querySelectorAll(".cat-chip").forEach(c => c.addEventListener("click", () => filterCategory(c.dataset.cat)));
 
-    document.querySelectorAll(".tab-item").forEach(t => {
-      t.addEventListener("click", () => switchTab(t.dataset.tab));
-    });
-    document.querySelectorAll(".cat-chip").forEach(c => {
-      c.addEventListener("click", () => filterCategory(c.dataset.cat));
-    });
+    document.addEventListener("backbutton", (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      const overlay = document.getElementById("detail-overlay");
+      if (overlay && overlay.style.display === "flex") { closeDetail(); return; }
+      const active = document.querySelector(".screen.active");
+      if (active?.id === "app") {
+        const tab = document.querySelector(".tab-item.active")?.dataset.tab;
+        if (tab === "home") { if (confirm("앱을 종료하시겠어요?")) navigator.app?.exitApp(); }
+        else switchTab("home");
+      } else if (active?.id === "result-screen") { showScreen("app"); }
+      else if (active?.id === "loading-screen") { clearTimers(); showScreen("app"); }
+    }, false);
   }
 
   function showScreen(name) {
     if (name === "login-check") name = currentUser ? "app" : "login";
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-    const idMap = { app: "app", login: "login", onboarding: "onboarding", splash: "splash", loading: "loading-screen", result: "result-screen" };
-    const el = document.getElementById(idMap[name] || name);
+    const map = {app:"app",login:"login",onboarding:"onboarding",splash:"splash",loading:"loading-screen",result:"result-screen"};
+    const el = document.getElementById(map[name]||name);
     if (el) el.classList.add("active");
     if (name === "app") { afterLogin(); switchTab("home"); }
   }
@@ -615,38 +547,32 @@
     const name = currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "회원";
     document.getElementById("greeting-text").textContent = `안녕하세요, ${name}님! 👋`;
     document.getElementById("settings-name").textContent = name;
-    document.getElementById("settings-email").textContent = currentUser.email || "";
-    document.getElementById("settings-email-value").textContent = currentUser.email || "";
+    document.getElementById("settings-email").textContent = currentUser.email||"";
+    document.getElementById("settings-email-value").textContent = currentUser.email||"";
     document.getElementById("settings-avatar").textContent = name.charAt(0).toUpperCase();
     loadHistory();
   }
 
   async function loginWithGoogle() {
-  await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.href } });
-}
+    await sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo:window.location.href } });
+  }
 
   async function deleteAccount() {
     if (!confirm("정말 탈퇴하시겠어요?\n저장된 모든 레시피와 계정 정보가 즉시 삭제됩니다.")) return;
     if (!confirm("한 번 더 확인합니다.\n탈퇴 후에는 복구가 불가능합니다.")) return;
     try {
-      // 사용자 레시피 전체 삭제
-      await fetch(`${SERVER}/api/users/${currentUser.id}`, { method: "DELETE" });
-      // Supabase 로그아웃
+      await fetch(`${SERVER}/api/users/${currentUser.id}`, { method:"DELETE" });
       await sb.auth.signOut();
       showToast("탈퇴가 완료됐어요.", "success");
       setTimeout(() => showScreen("login"), 1500);
-    } catch(e) {
-      showToast("탈퇴 처리 중 오류가 발생했어요. recipex.ai@gmail.com으로 문의해 주세요.", "error");
-    }
+    } catch(e) { showToast("탈퇴 처리 중 오류가 발생했어요.", "error"); }
   }
 
   async function logout() {
     if (!confirm("로그아웃 하시겠어요?")) return;
     await sb.auth.signOut();
-    showScreen("login");
   }
 
-  // ── 온보딩 ──────────────────────────────────────────────────
   function nextSlide() {
     document.getElementById(`slide-${onboardingIdx}`).classList.remove("active");
     document.getElementById(`slide-${onboardingIdx}`).classList.add("prev");
@@ -658,7 +584,6 @@
     if (onboardingIdx === 2) document.getElementById("onboarding-next").textContent = "시작하기";
   }
 
-  // ── 탭 전환 ─────────────────────────────────────────────────
   function switchTab(tab) {
     document.querySelectorAll(".app-tab").forEach(t => t.classList.add("hidden"));
     document.querySelectorAll(".tab-item").forEach(t => t.classList.remove("active"));
@@ -667,208 +592,146 @@
     if (tab === "vault") loadSavedRecipes("전체");
   }
 
-  // ── 히스토리 ────────────────────────────────────────────────
   async function loadHistory() {
     try {
       const r = await fetch(`${SERVER}/api/history?user_id=${currentUser.id}`);
       const data = await r.json();
-      renderHistory(data.history || []);
+      renderHistory(data.history||[]);
     } catch(e) { renderHistory([]); }
   }
 
   function renderHistory(list) {
     const el = document.getElementById("history-list");
-    if (!list.length) {
-      el.innerHTML = '<div class="history-empty">아직 분석한 레시피가 없어요 😊<br>위에서 영상 URL을 입력해보세요!</div>';
-      return;
-    }
+    if (!list.length) { el.innerHTML='<div class="history-empty">아직 분석한 레시피가 없어요 😊<br>위에서 영상 URL을 입력해보세요!</div>'; return; }
     el.innerHTML = list.slice(0,5).map(h => `
       <div class="history-item" onclick="reExtract('${h.source_url}')">
-        ${h.thumbnail_url ? `<img class="history-thumb" src="${h.thumbnail_url}" onerror="this.style.display='none'">` : `<div class="history-thumb-placeholder">🎬</div>`}
+        ${h.thumbnail_url?`<img class="history-thumb" src="${h.thumbnail_url}" onerror="this.style.display='none'">`:`<div class="history-thumb-placeholder">🎬</div>`}
         <div class="history-info">
           <div class="history-title">${h.title||"레시피"}</div>
           <div class="history-meta">${h.time_ago||""} · YouTube</div>
         </div>
         <div style="color:var(--gray3);font-size:20px">›</div>
-      </div>
-    `).join("");
+      </div>`).join("");
   }
 
-  function reExtract(url) {
-    document.getElementById("youtube-url").value = url;
-    extractYoutube();
-  }
+  function reExtract(url) { document.getElementById("youtube-url").value=url; extractYoutube(); }
 
-  // ── 로딩 ────────────────────────────────────────────────────
-  const CIRCUMFERENCE = 2 * Math.PI * 70;
+  const CIRCUMFERENCE = 2*Math.PI*70;
   let currentPercent = 0;
 
   function setPercent(pct) {
-    currentPercent = pct;
-    document.getElementById("circle-percent").textContent = Math.round(pct) + "%";
-    document.getElementById("circle-fill").style.strokeDashoffset = CIRCUMFERENCE - (pct/100)*CIRCUMFERENCE;
+    currentPercent=pct;
+    document.getElementById("circle-percent").textContent=Math.round(pct)+"%";
+    document.getElementById("circle-fill").style.strokeDashoffset=CIRCUMFERENCE-(pct/100)*CIRCUMFERENCE;
   }
 
   function setLoadStep(step) {
     [1,2,3,4].forEach(i => {
-      const ls = document.getElementById(`ls${i}`);
-      const ld = document.getElementById(`ld${i}`);
-      const lt = document.getElementById(`lt${i}`);
-      if (i < step) {
-        ls.className = "loading-step-item done";
-        ld.className = "step-dot done"; ld.textContent = "✓";
-        if (lt) lt.textContent = "완료";
-      } else if (i === step) {
-        ls.className = "loading-step-item active";
-        ld.className = "step-dot active"; ld.textContent = i;
-        if (i === 3 && lt) lt.textContent = "예상 30초~2분";
-      } else {
-        ls.className = "loading-step-item";
-        ld.className = "step-dot"; ld.textContent = i;
-        if (lt && i !== 3) lt.textContent = "";
-      }
+      const ls=document.getElementById(`ls${i}`),ld=document.getElementById(`ld${i}`),lt=document.getElementById(`lt${i}`);
+      if(i<step){ls.className="loading-step-item done";ld.className="step-dot done";ld.textContent="✓";if(lt)lt.textContent="완료";}
+      else if(i===step){ls.className="loading-step-item active";ld.className="step-dot active";ld.textContent=i;if(i===3&&lt)lt.textContent="예상 30초~2분";}
+      else{ls.className="loading-step-item";ld.className="step-dot";ld.textContent=i;if(lt&&i!==3)lt.textContent="";}
     });
   }
 
   function showLoadingError(msg) {
     clearTimers();
-    const box = document.getElementById("loading-error-box");
-    box.classList.remove("hidden");
-    if (msg) document.getElementById("loading-error-msg").innerHTML = `${msg}<br><br>가능한 원인<br>· 자막이 없는 영상<br>· 비공개 또는 삭제된 영상<br>· 지원하지 않는 형식`;
+    document.getElementById("loading-error-box").classList.remove("hidden");
+    if(msg) document.getElementById("loading-error-msg").innerHTML=`· AI 서버가 일시적으로 바빠서일 수 있어요. 잠시 후 다시 시도해주세요!<br><br>가능한 원인<br>· 자막이 없는 영상<br>· 비공개 또는 삭제된 영상<br>· 지원하지 않는 형식`;
     document.getElementById("retry-btn").classList.remove("hidden");
-    document.getElementById("circle-fill").style.stroke = "var(--red)";
-    document.getElementById("circle-percent").style.color = "var(--red)";
+    document.getElementById("circle-fill").style.stroke="var(--red)";
+    document.getElementById("circle-percent").style.color="var(--red)";
   }
 
   function startLoading() {
-    setPercent(0);
-    setLoadStep(1);
+    setPercent(0); setLoadStep(1);
     document.getElementById("loading-error-box").classList.add("hidden");
     document.getElementById("retry-btn").classList.add("hidden");
-    document.getElementById("circle-fill").style.stroke = "var(--orange)";
-    document.getElementById("circle-percent").style.color = "var(--orange)";
-    document.getElementById("extract-btn").disabled = true;
+    document.getElementById("circle-fill").style.stroke="var(--orange)";
+    document.getElementById("circle-percent").style.color="var(--orange)";
+    document.getElementById("extract-btn").disabled=true;
     showScreen("loading");
-    loadingTimer = setTimeout(() => { animatePercent(10, 30, 2000); setLoadStep(2); }, 500);
-    loadingTimer2 = setTimeout(() => { setLoadStep(3); animatePercent(30, 75, 25000); }, 2500);
+    loadingTimer=setTimeout(()=>{animatePercent(10,30,2000);setLoadStep(2);},500);
+    loadingTimer2=setTimeout(()=>{setLoadStep(3);animatePercent(30,75,25000);},2500);
   }
 
-  function animatePercent(from, to, duration) {
+  function animatePercent(from,to,duration) {
     clearInterval(progressTimer);
-    const steps = 60, interval = duration/steps, increment = (to-from)/steps;
-    let cur = from;
-    progressTimer = setInterval(() => {
-      cur += increment;
-      if (cur >= to) { setPercent(to); clearInterval(progressTimer); return; }
-      setPercent(cur);
-    }, interval);
+    const steps=60,interval=duration/steps,increment=(to-from)/steps;
+    let cur=from;
+    progressTimer=setInterval(()=>{cur+=increment;if(cur>=to){setPercent(to);clearInterval(progressTimer);return;}setPercent(cur);},interval);
   }
 
   function completeLoading(onDone) {
-    clearTimers();
-    setLoadStep(4); animatePercent(currentPercent, 90, 800);
-    setTimeout(() => {
-      animatePercent(90, 100, 500);
-      setTimeout(() => { showScreen("result"); onDone(); }, 600);
-    }, 900);
+    clearTimers(); setLoadStep(4); animatePercent(currentPercent,90,800);
+    setTimeout(()=>{animatePercent(90,100,500);setTimeout(()=>{showScreen("result");onDone();},600);},900);
   }
 
   function clearTimers() {
     clearTimeout(loadingTimer); clearTimeout(loadingTimer2); clearInterval(progressTimer);
-    document.getElementById("extract-btn").disabled = false;
+    document.getElementById("extract-btn").disabled=false;
   }
 
-  // ── 유튜브 추출 ─────────────────────────────────────────────
   async function extractYoutube() {
-    const url = document.getElementById("youtube-url").value.trim();
-    if (!url) return showToast("유튜브 URL을 입력해주세요.", "error");
-    currentUrl = url; lastUrl = url; currentThumbnail = "";
+    const url=document.getElementById("youtube-url").value.trim();
+    if(!url) return showToast("유튜브 URL을 입력해주세요.","error");
+    currentUrl=url; lastUrl=url; currentThumbnail="";
     startLoading();
     try {
-      const r = await fetch(`${SERVER}/api/extract`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, user_id: currentUser?.id })
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      if (data.thumbnailUrl) {
-        currentThumbnail = data.thumbnailUrl;
-        document.getElementById("result-thumbnail").src = data.thumbnailUrl;
-        document.getElementById("result-yt-link").href = url;
-        document.getElementById("result-thumb-area").classList.remove("hidden");
-      }
-      document.getElementById("method-badge").innerHTML = data.method === "gemini_video"
-        ? '<span class="method-tag tag-gemini">🎬 Gemini 영상 분석</span>'
-        : '<span class="method-tag tag-transcript">📝 자막 기반 분석</span>';
-      completeLoading(() => { showRecipes(data.recipes); loadHistory(); });
-    } catch(e) {
-      showLoadingError(e.message);
-    }
+      const r=await fetch(`${SERVER}/api/extract`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url,user_id:currentUser?.id})});
+      const data=await r.json();
+      if(data.error) throw new Error(data.error);
+      if(data.thumbnailUrl){currentThumbnail=data.thumbnailUrl;document.getElementById("result-thumbnail").src=data.thumbnailUrl;document.getElementById("result-yt-link").href=url;document.getElementById("result-thumb-area").classList.remove("hidden");}
+      document.getElementById("method-badge").innerHTML=data.method==="gemini_video"?'<span class="method-tag tag-gemini">🎬 Gemini 영상 분석</span>':'<span class="method-tag tag-transcript">📝 자막 기반 분석</span>';
+      completeLoading(()=>{showRecipes(data.recipes);loadHistory();});
+    } catch(e) { showLoadingError(e.message); }
   }
 
-  // ── 이미지 추출 ─────────────────────────────────────────────
   function handleImage(e) {
-    const f = e.target.files[0];
-    if (!f) return;
-    imageMime = f.type || "image/jpeg";
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      imageBase64 = ev.target.result.split(",")[1];
-      currentUrl = ""; currentThumbnail = "";
+    const f=e.target.files[0]; if(!f) return;
+    imageMime=f.type||"image/jpeg";
+    const reader=new FileReader();
+    reader.onload=async(ev)=>{
+      imageBase64=ev.target.result.split(",")[1];
+      currentUrl=""; currentThumbnail="";
       document.getElementById("result-thumb-area").classList.add("hidden");
       startLoading();
       try {
-        const r = await fetch(`${SERVER}/api/recipe-from-image`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64, mimeType: imageMime })
-        });
-        const data = await r.json();
-        if (data.error) throw new Error(data.error);
-        document.getElementById("method-badge").innerHTML = '<span class="method-tag tag-gemini">📸 이미지 분석</span>';
-        completeLoading(() => showRecipes(data.recipes));
-      } catch(e) { showLoadingError(e.message); }
+        const r=await fetch(`${SERVER}/api/recipe-from-image`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({imageBase64,mimeType:imageMime})});
+        const data=await r.json();
+        if(data.error) throw new Error(data.error);
+        document.getElementById("method-badge").innerHTML='<span class="method-tag tag-gemini">📸 이미지 분석</span>';
+        completeLoading(()=>showRecipes(data.recipes));
+      } catch(e){showLoadingError(e.message);}
     };
     reader.readAsDataURL(f);
   }
 
-  // ── 추출 결과 ────────────────────────────────────────────────
   function showRecipes(recipes) {
-    allRecipes = recipes;
-    const tabsEl = document.getElementById("result-recipe-tabs");
-    tabsEl.innerHTML = "";
-    if (recipes.length > 1) {
-      recipes.forEach((r, i) => {
-        const btn = document.createElement("button");
-        btn.className = "rtab" + (i===0?" active":"");
-        btn.textContent = r.title||`레시피 ${i+1}`;
-        btn.onclick = () => selectRecipe(i);
-        tabsEl.appendChild(btn);
-      });
-    }
+    allRecipes=recipes;
+    const tabsEl=document.getElementById("result-recipe-tabs"); tabsEl.innerHTML="";
+    if(recipes.length>1){recipes.forEach((r,i)=>{const btn=document.createElement("button");btn.className="rtab"+(i===0?" active":"");btn.textContent=r.title||`레시피 ${i+1}`;btn.onclick=()=>selectRecipe(i);tabsEl.appendChild(btn);});}
     selectRecipe(0);
   }
 
   function selectRecipe(idx) {
-    currentRecipeIdx = idx;
-    document.querySelectorAll(".rtab").forEach((t,i) => t.classList.toggle("active", i===idx));
-    const r = allRecipes[idx];
-    extractBaseServings = parseFloat(r.servings)||1;
-    extractServings = extractBaseServings;
-    extractBaseIngredients = JSON.parse(JSON.stringify(r.ingredients||[]));
-    currentDetailTab = "ingredients";
-    renderResultBody(r);
+    currentRecipeIdx=idx;
+    document.querySelectorAll(".rtab").forEach((t,i)=>t.classList.toggle("active",i===idx));
+    const r=allRecipes[idx];
+    extractBaseServings=parseFloat(r.servings)||1; extractServings=extractBaseServings;
+    extractBaseIngredients=JSON.parse(JSON.stringify(r.ingredients||[]));
+    currentDetailTab="ingredients"; renderResultBody(r);
   }
 
   function renderResultBody(r) {
-    const ratio = extractServings/extractBaseServings;
-    const si = extractBaseIngredients.map(ing => ({...ing, amount: scaleAmount(ing.amount, ratio)}));
-    document.getElementById("result-body").innerHTML = `
+    const ratio=extractServings/extractBaseServings;
+    const si=extractBaseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}));
+    document.getElementById("result-body").innerHTML=`
       <div class="result-title">${r.title||""}</div>
       <div class="result-desc">${r.description||""}</div>
       <div class="meta-row">
         <div class="meta-box"><div class="meta-box-label">조리 시간</div><div class="meta-box-value">${r.time||"-"}</div></div>
-        <div class="meta-box">
-          <div class="meta-box-label">인분</div>
+        <div class="meta-box"><div class="meta-box-label">인분</div>
           <div class="servings-control">
             <button class="srv-btn" onclick="changeExtractServings(-1)">−</button>
             <span id="extract-servings" style="font-size:15px;font-weight:700">${extractServings}인분</span>
@@ -876,8 +739,7 @@
           </div>
         </div>
       </div>
-      ${r.nutrition?`
-      <div class="nutrition-row">
+      ${r.nutrition?`<div class="nutrition-row">
         <div class="nut-box"><div class="nut-label">칼로리</div><div class="nut-value" id="enut-cal">${r.nutrition.calories}</div></div>
         <div class="nut-box"><div class="nut-label">탄수화물</div><div class="nut-value" id="enut-carb">${r.nutrition.carbs}</div></div>
         <div class="nut-box"><div class="nut-label">단백질</div><div class="nut-value" id="enut-prot">${r.nutrition.protein}</div></div>
@@ -889,180 +751,109 @@
       </div>
       <div id="result-tab-content">
         ${currentDetailTab==="ingredients"
-          ? si.map(ing=>`<div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>`).join("")
-          : (r.steps||[]).map((s,i)=>`<div class="step-row2"><div class="step-num2">${i+1}</div><div class="step-text2">${s}</div></div>`).join("")
-        }
+          ?si.map(ing=>`<div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>`).join("")
+          :(r.steps||[]).map((s,i)=>`<div class="step-row2"><div class="step-num2">${i+1}</div><div class="step-text2">${s}</div></div>`).join("")}
       </div>`;
   }
 
-  function switchDetailTab(tab) { currentDetailTab = tab; renderResultBody(allRecipes[currentRecipeIdx]); }
+  function switchDetailTab(tab){currentDetailTab=tab;renderResultBody(allRecipes[currentRecipeIdx]);}
 
-  function changeExtractServings(delta) {
-    extractServings = Math.max(1, extractServings+delta);
-    const ratio = extractServings/extractBaseServings;
-    document.getElementById("extract-servings").textContent = extractServings+"인분";
-    if (currentDetailTab==="ingredients") {
-      document.getElementById("result-tab-content").innerHTML = extractBaseIngredients.map(ing=>`
-        <div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${scaleAmount(ing.amount,ratio)}</span></div>
-      `).join("");
-    }
-    const r = allRecipes[currentRecipeIdx];
-    if (r.nutrition) {
-      [["cal","calories"],["carb","carbs"],["prot","protein"],["fat","fat"]].forEach(([k,key])=>{
-        const el=document.getElementById(`enut-${k}`);
-        if(el) el.textContent=scaleNut(r.nutrition[key],ratio);
-      });
-    }
+  function changeExtractServings(delta){
+    extractServings=Math.max(1,extractServings+delta);
+    const ratio=extractServings/extractBaseServings;
+    document.getElementById("extract-servings").textContent=extractServings+"인분";
+    if(currentDetailTab==="ingredients") document.getElementById("result-tab-content").innerHTML=extractBaseIngredients.map(ing=>`<div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${scaleAmount(ing.amount,ratio)}</span></div>`).join("");
+    const r=allRecipes[currentRecipeIdx];
+    if(r.nutrition)[["cal","calories"],["carb","carbs"],["prot","protein"],["fat","fat"]].forEach(([k,key])=>{const el=document.getElementById(`enut-${k}`);if(el)el.textContent=scaleNut(r.nutrition[key],ratio);});
   }
 
-  // ── 복사 ────────────────────────────────────────────────────
-  function copyRecipe() {
-    const r = allRecipes[currentRecipeIdx];
-    if (!r) return;
-    const ratio = extractServings/extractBaseServings;
-    const si = extractBaseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}));
-    const text = [
-      `📋 ${r.title}`,
-      `${r.description||""}`,
-      ``,
-      `⏱ 조리시간: ${r.time||"-"} | 👥 ${extractServings}인분`,
-      ``,
-      `🥣 재료`,
-      ...si.map(ing=>`• ${ing.name} ${ing.amount}`),
-      ``,
-      `👨‍🍳 조리 방법`,
-      ...(r.steps||[]).map((s,i)=>`${i+1}. ${s}`),
-      ``,
-      `📱 레시피X로 추출한 레시피`
-    ].join("\n");
-    navigator.clipboard.writeText(text).then(()=>showToast("클립보드에 복사됐어요!", "success")).catch(()=>showToast("복사 실패", "error"));
+  function copyRecipe(){
+    const r=allRecipes[currentRecipeIdx]; if(!r) return;
+    const ratio=extractServings/extractBaseServings;
+    const si=extractBaseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}));
+    const text=[`📋 ${r.title}`,`${r.description||""}`,``,`⏱ 조리시간: ${r.time||"-"} | 👥 ${extractServings}인분`,``,`🥣 재료`,...si.map(ing=>`• ${ing.name} ${ing.amount}`),``,`👨‍🍳 조리 방법`,...(r.steps||[]).map((s,i)=>`${i+1}. ${s}`),``,`📱 레시피X로 정리한 레시피`].join("\n");
+    navigator.clipboard.writeText(text).then(()=>showToast("클립보드에 복사됐어요!","success")).catch(()=>showToast("복사 실패","error"));
   }
 
-  // ── 저장 ────────────────────────────────────────────────────
-  async function saveRecipe() {
-    const recipe = allRecipes[currentRecipeIdx];
-    const category = document.getElementById("category-select").value;
-    if (!recipe) return;
-    const btn = document.getElementById("save-btn");
-    btn.disabled = true; btn.textContent = "저장 중...";
-    try {
-      const r = await fetch(`${SERVER}/api/save-recipe`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipe, category, source_url: currentUrl, thumbnail_url: currentThumbnail, user_id: currentUser.id })
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      btn.textContent = "✅ 저장됐어요!";
-      showToast(`"${recipe.title}" 저장 완료!`, "success");
-      setTimeout(()=>{ btn.disabled=false; btn.textContent="💾 저장하기"; }, 3000);
-    } catch(e) {
-      btn.disabled=false; btn.textContent="💾 저장하기";
-      showToast("저장 실패: "+e.message, "error");
-    }
+  async function saveRecipe(){
+    const recipe=allRecipes[currentRecipeIdx]; const category=document.getElementById("category-select").value;
+    if(!recipe) return;
+    const btn=document.getElementById("save-btn"); btn.disabled=true; btn.textContent="저장 중...";
+    try{
+      const r=await fetch(`${SERVER}/api/save-recipe`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipe,category,source_url:currentUrl,thumbnail_url:currentThumbnail,user_id:currentUser.id})});
+      const data=await r.json(); if(data.error) throw new Error(data.error);
+      btn.textContent="✅ 저장됐어요!"; showToast(`"${recipe.title}" 저장 완료!`,"success");
+      setTimeout(()=>{btn.disabled=false;btn.textContent="💾 저장하기";},3000);
+    }catch(e){btn.disabled=false;btn.textContent="💾 저장하기";showToast("저장 실패: "+e.message,"error");}
   }
 
-  // ── 보관함 ──────────────────────────────────────────────────
-  async function loadSavedRecipes(category) {
-    document.querySelectorAll(".cat-chip").forEach(b=>b.classList.toggle("active", b.dataset.cat===category));
-    document.getElementById("search-input").value = "";
-    const list = document.getElementById("vault-list");
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray3)">불러오는 중...</div>';
-    try {
-      const r = await fetch(`${SERVER}/api/recipes?category=${encodeURIComponent(category)}&user_id=${currentUser.id}`);
-      const data = await r.json();
-      allSavedRecipes = data.recipes||[];
-      renderVaultList(allSavedRecipes);
-    } catch(e) {
-      list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">불러오기 실패</div>';
-    }
+  async function loadSavedRecipes(category){
+    document.querySelectorAll(".cat-chip").forEach(b=>b.classList.toggle("active",b.dataset.cat===category));
+    document.getElementById("search-input").value="";
+    const list=document.getElementById("vault-list");
+    list.innerHTML='<div style="text-align:center;padding:40px;color:var(--gray3)">불러오는 중...</div>';
+    try{
+      const r=await fetch(`${SERVER}/api/recipes?category=${encodeURIComponent(category)}&user_id=${currentUser.id}`);
+      const data=await r.json(); allSavedRecipes=data.recipes||[]; renderVaultList(allSavedRecipes);
+    }catch(e){list.innerHTML='<div style="text-align:center;padding:40px;color:var(--red)">불러오기 실패</div>';}
   }
 
-  function filterCategory(cat) { loadSavedRecipes(cat); }
-  function filterSearch(keyword) {
-    renderVaultList(keyword.trim() ? allSavedRecipes.filter(r=>r.title?.toLowerCase().includes(keyword.toLowerCase())) : allSavedRecipes);
-  }
+  function filterCategory(cat){loadSavedRecipes(cat);}
+  function filterSearch(keyword){renderVaultList(keyword.trim()?allSavedRecipes.filter(r=>r.title?.toLowerCase().includes(keyword.toLowerCase())):allSavedRecipes);}
 
-  function renderVaultList(recipes) {
-    const list = document.getElementById("vault-list");
-    if (!recipes.length) {
-      list.innerHTML = `<div class="vault-empty"><div class="vault-empty-icon">🍽️</div><div class="vault-empty-title">저장된 레시피가 없어요</div><div style="font-size:13px">레시피를 분석하고 저장해보세요!</div></div>`;
-      return;
-    }
-    list.innerHTML = recipes.map(r=>`
+  function renderVaultList(recipes){
+    const list=document.getElementById("vault-list");
+    if(!recipes.length){list.innerHTML=`<div class="vault-empty"><div class="vault-empty-icon">🍽️</div><div class="vault-empty-title">저장된 레시피가 없어요</div><div style="font-size:13px">레시피를 분석하고 저장해보세요!</div></div>`;return;}
+    list.innerHTML=recipes.map(r=>`
       <div class="vault-item" data-id="${r.id}">
-        ${r.thumbnail_url?`<img class="vault-thumb" src="${r.thumbnail_url}" onerror="this.style.display='none'">`:
-        `<div class="vault-thumb-placeholder">🍳</div>`}
+        ${r.thumbnail_url?`<img class="vault-thumb" src="${r.thumbnail_url}" onerror="this.style.display='none'">`:`<div class="vault-thumb-placeholder">🍳</div>`}
         <div class="vault-info">
           <div class="vault-title">${r.title}</div>
           <div class="vault-meta">${r.time||""} ${r.servings?`· ${r.servings}`:""}</div>
           <div class="vault-tags"><span class="vault-tag">${r.category}</span>${r.source_url?`<span class="vault-tag">YouTube</span>`:""}</div>
         </div>
         <button class="vault-fav" onclick="event.stopPropagation();toggleFavorite('${r.id}',${r.is_favorite})">${r.is_favorite?"❤️":"🤍"}</button>
-      </div>
-    `).join("");
+      </div>`).join("");
     document.querySelectorAll(".vault-item").forEach(item=>{
-      item.addEventListener("click", ()=>{
-        const recipe = allSavedRecipes.find(r=>String(r.id)===String(item.dataset.id));
-        if (recipe) showSavedDetail(recipe);
-      });
+      item.addEventListener("click",()=>{const recipe=allSavedRecipes.find(r=>String(r.id)===String(item.dataset.id));if(recipe)showSavedDetail(recipe);});
     });
   }
 
-  async function toggleFavorite(id, current) {
-    try {
-      await fetch(`${SERVER}/api/recipes/${id}/favorite`, {
-        method:"PUT", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({is_favorite:!current})
-      });
-      loadSavedRecipes(document.querySelector(".cat-chip.active")?.dataset.cat||"전체");
-    } catch(e) { showToast("즐겨찾기 실패","error"); }
+  async function toggleFavorite(id,current){
+    try{await fetch(`${SERVER}/api/recipes/${id}/favorite`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({is_favorite:!current})});loadSavedRecipes(document.querySelector(".cat-chip.active")?.dataset.cat||"전체");}
+    catch(e){showToast("즐겨찾기 실패","error");}
   }
 
-  // ── 레시피 상세 ─────────────────────────────────────────────
-  function showSavedDetail(r) {
-    currentServings = parseFloat(r.servings)||1;
-    baseServings = currentServings;
-    baseIngredients = JSON.parse(JSON.stringify(r.ingredients||[]));
-    const el = document.getElementById("saved-detail");
-    el._savedRecipe = r; el._detailTab = "ingredients";
-    document.getElementById("detail-overlay").style.display = "flex";
-    document.body.style.overflow = "hidden";
-    renderSavedRecipe(r, false);
-    // 별점/후기/메모 로드
+  function showSavedDetail(r){
+    currentServings=parseFloat(r.servings)||1; baseServings=currentServings;
+    baseIngredients=JSON.parse(JSON.stringify(r.ingredients||[]));
+    const el=document.getElementById("saved-detail"); el._savedRecipe=r; el._detailTab="ingredients";
+    document.getElementById("detail-overlay").style.display="flex";
+    document.body.style.overflow="hidden";
+    renderSavedRecipe(r,false);
     setStars(r.rating||0);
-    document.getElementById("review-input").value = r.review||"";
-    document.getElementById("memo-input").value = r.memo||"";
-    document.getElementById("rating-save-btn").onclick = () => saveRating(r.id);
+    document.getElementById("review-input").value=r.review||"";
+    document.getElementById("memo-input").value=r.memo||"";
+    document.getElementById("rating-save-btn").onclick=()=>saveRating(r.id);
   }
 
-  function closeDetail() {
-    document.getElementById("detail-overlay").style.display = "none";
-    document.body.style.overflow = "";
+  function closeDetail(){document.getElementById("detail-overlay").style.display="none";document.body.style.overflow="";}
+
+  let currentRating=0;
+  function setStars(v){currentRating=v;document.querySelectorAll(".star").forEach(s=>s.classList.toggle("active",parseInt(s.dataset.v)<=v));}
+
+  async function saveRating(id){
+    const review=document.getElementById("review-input").value;
+    const memo=document.getElementById("memo-input").value;
+    await sb.from("recipes").update({rating:currentRating,review,memo}).eq("id",id);
+    showToast("저장됐어요! ⭐","success");
   }
 
-  let currentRating = 0;
-  function setStars(v) {
-    currentRating = v;
-    document.querySelectorAll(".star").forEach(s => {
-      s.classList.toggle("active", parseInt(s.dataset.v) <= v);
-    });
-  }
-  document.getElementById("star-row").addEventListener("click", e => {
-    if (e.target.classList.contains("star")) setStars(parseInt(e.target.dataset.v));
-  });
-  async function saveRating(id) {
-    const review = document.getElementById("review-input").value;
-    const memo = document.getElementById("memo-input").value;
-    await sb.from("recipes").update({ rating: currentRating, review, memo }).eq("id", id);
-    showToast("저장됐어요! ⭐", "success");
-  }
-
-  function renderSavedRecipe(r, editable) {
-    const el = document.getElementById("saved-detail");
-    const tab = el._detailTab||"ingredients";
-    const ratio = currentServings/baseServings;
-    const si = baseIngredients.map(ing=>({...ing, amount:scaleAmount(ing.amount,ratio)}));
-    el.innerHTML = `
+  function renderSavedRecipe(r,editable){
+    const el=document.getElementById("saved-detail"),tab=el._detailTab||"ingredients";
+    const ratio=currentServings/baseServings;
+    const si=baseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}));
+    el.innerHTML=`
       ${r.thumbnail_url?`<div class="detail-thumb-wrap"><img class="detail-thumb" src="${r.thumbnail_url}">${r.source_url?`<a href="${r.source_url}" target="_blank" class="detail-yt-btn">▶ 유튜브</a>`:""}</div>`:""}
       ${editable?`
         <div style="margin-bottom:12px"><div class="edit-label">요리명</div><input class="edit-input" id="sedit-title" value="${r.title||""}"></div>
@@ -1070,8 +861,7 @@
         <div class="meta-row" style="margin-bottom:12px">
           <div><div class="edit-label">조리 시간</div><input class="edit-input" id="sedit-time" value="${r.time||""}"></div>
           <div><div class="edit-label">인분</div><input class="edit-input" id="sedit-servings" value="${r.servings||""}"></div>
-        </div>
-      `:`
+        </div>`:`
         <div class="detail-title">${r.title||""}</div>
         <div class="detail-desc">${r.description||""}</div>
         <div class="meta-row">
@@ -1083,10 +873,8 @@
               <button class="srv-btn" onclick="changeSavedServings(1)">+</button>
             </div>
           </div>
-        </div>
-      `}
-      ${r.nutrition?`
-      <div class="nutrition-row">
+        </div>`}
+      ${r.nutrition?`<div class="nutrition-row">
         <div class="nut-box"><div class="nut-label">칼로리</div><div class="nut-value" id="dnut-cal">${scaleNut(r.nutrition.calories,ratio)}</div></div>
         <div class="nut-box"><div class="nut-label">탄수화물</div><div class="nut-value" id="dnut-carb">${scaleNut(r.nutrition.carbs,ratio)}</div></div>
         <div class="nut-box"><div class="nut-label">단백질</div><div class="nut-value" id="dnut-prot">${scaleNut(r.nutrition.protein,ratio)}</div></div>
@@ -1100,19 +888,15 @@
         ${tab==="ingredients"
           ?(editable
             ?si.map((ing,i)=>`<div class="ingredient-row"><input class="edit-input" id="sing-name-${i}" value="${ing.name}" style="width:52%"><input class="edit-input" id="sing-amount-${i}" value="${ing.amount}" style="width:32%;margin-left:4px"><button class="btn-remove-row" onclick="removeSavedIngredient(${i})">✕</button></div>`).join("")
-            :si.map(ing=>`<div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>`).join("")
-          )
+            :si.map(ing=>`<div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${ing.amount}</span></div>`).join(""))
           :(editable
             ?(r.steps||[]).map((s,i)=>`<div class="step-row2"><div class="step-num2">${i+1}</div><textarea class="edit-textarea" id="sstep-${i}" rows="2">${s}</textarea><button class="btn-remove-row" onclick="removeSavedStep(${i})" style="flex-shrink:0;margin-left:4px">✕</button></div>`).join("")
-            :(r.steps||[]).map((s,i)=>`<div class="step-row2"><div class="step-num2">${i+1}</div><div class="step-text2">${s}</div></div>`).join("")
-          )
-        }
+            :(r.steps||[]).map((s,i)=>`<div class="step-row2"><div class="step-num2">${i+1}</div><div class="step-text2">${s}</div></div>`).join(""))}
       </div>
       ${editable?`
         ${tab==="ingredients"?`<button class="btn-add-row" onclick="addSavedIngredient()">+ 재료 추가</button>`:`<button class="btn-add-row" onclick="addSavedStep()">+ 단계 추가</button>`}
         <button class="btn-edit-done" onclick="applySavedEdit()">✅ 수정 완료</button>
-        <button class="btn-edit-cancel" onclick="cancelSavedEdit()">취소</button>
-      `:`
+        <button class="btn-edit-cancel" onclick="cancelSavedEdit()">취소</button>`:`
         <div class="detail-actions">
           <button class="btn-detail-edit" onclick="startSavedEdit()">✏️ 수정</button>
           <button class="btn-detail-copy" onclick="copySavedRecipe()">📋 복사</button>
@@ -1123,222 +907,140 @@
           <button class="btn-detail-copy" style="flex:1" onclick="downloadImage()">🖼️ 이미지</button>
           <button class="btn-detail-copy" style="flex:1" onclick="shareApp()">🔗 앱 공유</button>
         </div>
-        <button class="btn-delete" onclick="deleteRecipe('${r.id}')">🗑️ 삭제하기</button>
-      `}`;
+        <button class="btn-delete" onclick="deleteRecipe('${r.id}')">🗑️ 삭제하기</button>`}`;
   }
 
-  function copySavedRecipe() {
-    const r = document.getElementById("saved-detail")._savedRecipe;
-    const ratio = currentServings/baseServings;
-    const si = baseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}));
-    const text = [`📋 ${r.title}`,`${r.description||""}`,``,`⏱ ${r.time||"-"} | 👥 ${currentServings}인분`,``,`🥣 재료`,...si.map(ing=>`• ${ing.name} ${ing.amount}`),``,`👨‍🍳 조리 방법`,...(r.steps||[]).map((s,i)=>`${i+1}. ${s}`),``,`📱 RecipeX로 추출한 레시피`].join("\n");
+  function copySavedRecipe(){
+    const r=document.getElementById("saved-detail")._savedRecipe;
+    const ratio=currentServings/baseServings;
+    const si=baseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}));
+    const text=[`📋 ${r.title}`,`${r.description||""}`,``,`⏱ ${r.time||"-"} | 👥 ${currentServings}인분`,``,`🥣 재료`,...si.map(ing=>`• ${ing.name} ${ing.amount}`),``,`👨‍🍳 조리 방법`,...(r.steps||[]).map((s,i)=>`${i+1}. ${s}`),``,`📱 레시피X로 정리한 레시피`].join("\n");
     navigator.clipboard.writeText(text).then(()=>showToast("클립보드에 복사됐어요!","success")).catch(()=>showToast("복사 실패","error"));
   }
 
-  function switchSavedTab(tab) { document.getElementById("saved-detail")._detailTab=tab; renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe,false); }
-  function changeSavedServings(delta) {
-    currentServings = Math.max(1, currentServings+delta);
-    const ratio = currentServings/baseServings;
-    document.getElementById("detail-servings").textContent = currentServings+"인분";
-    const tab = document.getElementById("saved-detail")._detailTab;
-    if (tab==="ingredients") {
-      document.getElementById("saved-tab-content").innerHTML = baseIngredients.map(ing=>`
-        <div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${scaleAmount(ing.amount,ratio)}</span></div>
-      `).join("");
-    }
-    const r = document.getElementById("saved-detail")._savedRecipe;
-    if (r.nutrition) {
-      [["cal","calories"],["carb","carbs"],["prot","protein"],["fat","fat"]].forEach(([k,key])=>{
-        const el=document.getElementById(`dnut-${k}`); if(el) el.textContent=scaleNut(r.nutrition[key],ratio);
-      });
-    }
+  function switchSavedTab(tab){document.getElementById("saved-detail")._detailTab=tab;renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe,false);}
+
+  function changeSavedServings(delta){
+    currentServings=Math.max(1,currentServings+delta);
+    const ratio=currentServings/baseServings;
+    document.getElementById("detail-servings").textContent=currentServings+"인분";
+    const tab=document.getElementById("saved-detail")._detailTab;
+    if(tab==="ingredients") document.getElementById("saved-tab-content").innerHTML=baseIngredients.map(ing=>`<div class="ingredient-row"><span class="ingredient-name">${ing.name}</span><span class="ingredient-amount">${scaleAmount(ing.amount,ratio)}</span></div>`).join("");
+    const r=document.getElementById("saved-detail")._savedRecipe;
+    if(r.nutrition)[["cal","calories"],["carb","carbs"],["prot","protein"],["fat","fat"]].forEach(([k,key])=>{const el=document.getElementById(`dnut-${k}`);if(el)el.textContent=scaleNut(r.nutrition[key],ratio);});
   }
 
-  function startSavedEdit() { renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe,true); }
-  function cancelSavedEdit() { renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe,false); }
-  function applySavedEdit() {
-    const el=document.getElementById("saved-detail"), r=el._savedRecipe;
+  function startSavedEdit(){renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe,true);}
+  function cancelSavedEdit(){renderSavedRecipe(document.getElementById("saved-detail")._savedRecipe,false);}
+
+  function applySavedEdit(){
+    const el=document.getElementById("saved-detail"),r=el._savedRecipe;
     r.title=document.getElementById("sedit-title").value;
     r.description=document.getElementById("sedit-desc").value;
     r.time=document.getElementById("sedit-time").value;
     r.servings=document.getElementById("sedit-servings").value;
     r.ingredients=r.ingredients.map((ing,i)=>({name:document.getElementById(`sing-name-${i}`)?.value||ing.name,amount:document.getElementById(`sing-amount-${i}`)?.value||ing.amount}));
     r.steps=r.steps.map((s,i)=>document.getElementById(`sstep-${i}`)?.value||s);
-    el._savedRecipe=r;
-    updateSavedRecipe(r);
+    el._savedRecipe=r; updateSavedRecipe(r);
   }
-  async function updateSavedRecipe(r) {
-    try {
+
+  async function updateSavedRecipe(r){
+    try{
       const res=await fetch(`${SERVER}/api/recipes/${r.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(r)});
-      const data=await res.json();
-      if(data.error) throw new Error(data.error);
-      showToast("수정 완료!","success");
-      renderSavedRecipe(r,false);
+      const data=await res.json(); if(data.error) throw new Error(data.error);
+      showToast("수정 완료!","success"); renderSavedRecipe(r,false);
       loadSavedRecipes(document.querySelector(".cat-chip.active")?.dataset.cat||"전체");
-    } catch(e){showToast("수정 실패: "+e.message,"error");}
+    }catch(e){showToast("수정 실패: "+e.message,"error");}
   }
+
   function addSavedIngredient(){const el=document.getElementById("saved-detail");el._savedRecipe.ingredients.push({name:"",amount:""});renderSavedRecipe(el._savedRecipe,true);}
   function removeSavedIngredient(i){const el=document.getElementById("saved-detail");el._savedRecipe.ingredients.splice(i,1);renderSavedRecipe(el._savedRecipe,true);}
   function addSavedStep(){const el=document.getElementById("saved-detail");el._savedRecipe.steps.push("");renderSavedRecipe(el._savedRecipe,true);}
   function removeSavedStep(i){const el=document.getElementById("saved-detail");el._savedRecipe.steps.splice(i,1);renderSavedRecipe(el._savedRecipe,true);}
+
   async function deleteRecipe(id){
     if(!confirm("정말 삭제할까요?")) return;
     try{await fetch(`${SERVER}/api/recipes/${id}`,{method:"DELETE"});closeDetail();loadSavedRecipes(document.querySelector(".cat-chip.active")?.dataset.cat||"전체");showToast("삭제됐어요.","success");}
     catch(e){showToast("삭제 실패","error");}
   }
 
-  // ── 앱 공유 ──────────────────────────────────────────────────
-  function shareApp() {
-    const text = `📱 레시피X\n영상 속 레시피를 AI로 자동 추출해주는 앱!\n\n🔗 recipe-app-eight-lake.vercel.app`;
-    if (navigator.share) {
-      navigator.share({ title: "레시피X", text, url: "https://recipe-app-eight-lake.vercel.app" })
-        .catch(() => {});
-    } else {
-      navigator.clipboard.writeText(text)
-        .then(() => showToast("앱 링크가 복사됐어요!", "success"))
-        .catch(() => showToast("복사 실패", "error"));
-    }
+  function shareApp(){
+    const text=`📱 레시피X\n영상 속 레시피를 AI로 자동 정리해주는 앱!\n\n🔗 recipe-app-eight-lake.vercel.app`;
+    if(navigator.share){navigator.share({title:"레시피X",text,url:"https://recipe-app-eight-lake.vercel.app"}).catch(()=>{});}
+    else{navigator.clipboard.writeText(text).then(()=>showToast("앱 링크가 복사됐어요!","success")).catch(()=>showToast("복사 실패","error"));}
   }
 
-  // ── PDF / 이미지 다운로드 ────────────────────────────────────
-  function getPrintData() {
-    const el = document.getElementById("saved-detail");
-    const r = el._savedRecipe;
-    const ratio = currentServings / baseServings;
-    const si = baseIngredients.map(ing => ({...ing, amount: scaleAmount(ing.amount, ratio)}));
-    return { r, si };
+  function getPrintData(){
+    const el=document.getElementById("saved-detail"),r=el._savedRecipe;
+    const ratio=currentServings/baseServings;
+    return{r,si:baseIngredients.map(ing=>({...ing,amount:scaleAmount(ing.amount,ratio)}))};
   }
 
-  function buildPrintArea(r, si) {
-    const area = document.createElement("div");
-    area.id = "print-area";
-    area.innerHTML = `
+  function buildPrintArea(r,si){
+    const area=document.createElement("div"); area.id="print-area";
+    area.innerHTML=`
       <div class="print-title">${r.title||""}</div>
       <div class="print-desc">${r.description||""}</div>
-      <div class="print-meta">
-        <span>⏱ ${r.time||"-"}</span>
-        <span>👥 ${currentServings}인분</span>
-      </div>
-      ${r.nutrition ? `
-      <div style="display:flex;gap:12px;margin-bottom:16px;font-size:12px">
-        <span>🔥 ${r.nutrition.calories}</span>
-        <span>탄수화물 ${r.nutrition.carbs}</span>
-        <span>단백질 ${r.nutrition.protein}</span>
-        <span>지방 ${r.nutrition.fat}</span>
-      </div>` : ""}
+      <div class="print-meta"><span>⏱ ${r.time||"-"}</span><span>👥 ${currentServings}인분</span></div>
+      ${r.nutrition?`<div style="display:flex;gap:12px;margin-bottom:16px;font-size:12px"><span>🔥 ${r.nutrition.calories}</span><span>탄수화물 ${r.nutrition.carbs}</span><span>단백질 ${r.nutrition.protein}</span><span>지방 ${r.nutrition.fat}</span></div>`:""}
       <div class="print-section">🥣 재료</div>
-      ${si.map(ing => `<div class="print-ing-row"><span>${ing.name}</span><span>${ing.amount}</span></div>`).join("")}
+      ${si.map(ing=>`<div class="print-ing-row"><span>${ing.name}</span><span>${ing.amount}</span></div>`).join("")}
       <div class="print-section">👨‍🍳 조리 방법</div>
-      ${(r.steps||[]).map((s,i) => `<div class="print-step-row"><div class="print-step-num">${i+1}</div><div>${s}</div></div>`).join("")}
+      ${(r.steps||[]).map((s,i)=>`<div class="print-step-row"><div class="print-step-num">${i+1}</div><div>${s}</div></div>`).join("")}
       <div class="print-footer">
-        <div style="font-size:14px;font-weight:800;margin-bottom:4px">Recipe<span style="color:#FF8A00">X</span></div>
-        <div style="font-size:11px;color:#aaa">영상 속 레시피를 추출하고 정리하세요</div>
+        <div style="font-size:14px;font-weight:800;margin-bottom:4px">레시피<span style="color:#FF8A00">X</span></div>
+        <div style="font-size:11px;color:#aaa">영상 속 레시피를 AI가 정리해드려요</div>
         <div style="font-size:11px;color:#FF8A00;margin-top:2px">recipe-app-eight-lake.vercel.app</div>
-      </div>
-    `;
+      </div>`;
     return area;
   }
 
-  function downloadPDF() {
-    const { r, si } = getPrintData();
-    const old = document.getElementById("print-area");
-    if (old) old.remove();
-    const area = buildPrintArea(r, si);
-    area.style.cssText = "position:fixed;top:0;left:0;width:100%;padding:40px;background:white;font-family:sans-serif;color:#111;z-index:9999;";
-    area.querySelectorAll(".print-title").forEach(el => el.style.cssText = "font-size:22px;font-weight:800;margin-bottom:6px");
-    area.querySelectorAll(".print-desc").forEach(el => el.style.cssText = "font-size:13px;color:#666;margin-bottom:12px");
-    area.querySelectorAll(".print-meta").forEach(el => el.style.cssText = "font-size:12px;color:#444;margin-bottom:16px;display:flex;gap:16px");
-    area.querySelectorAll(".print-section").forEach(el => el.style.cssText = "font-size:14px;font-weight:700;margin:14px 0 6px;border-bottom:2px solid #FF8A00;padding-bottom:3px;color:#111");
-    area.querySelectorAll(".print-ing-row").forEach(el => el.style.cssText = "display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #eee");
-    area.querySelectorAll(".print-step-row").forEach(el => el.style.cssText = "display:flex;gap:8px;margin-bottom:8px;font-size:12px;line-height:1.6");
-    area.querySelectorAll(".print-step-num").forEach(el => el.style.cssText = "min-width:22px;height:22px;border-radius:50%;background:#FF8A00;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0");
-    area.querySelectorAll(".print-footer").forEach(el => el.style.cssText = "margin-top:24px;padding-top:12px;border-top:1px solid #eee;text-align:center");
-    document.body.appendChild(area);
-
-    // 기존 앱 숨기기
-    document.querySelectorAll(".screen").forEach(s => s.style.display = "none");
-
-    setTimeout(() => {
-      window.print();
-      // 프린트 후 복구
-      setTimeout(() => {
-        document.querySelectorAll(".screen").forEach(s => s.style.display = "");
-        document.querySelector(".screen.active").style.display = "flex";
-        area.remove();
-      }, 1000);
-    }, 300);
+  function applyPrintStyles(area,forPrint){
+    area.querySelectorAll(".print-title").forEach(el=>el.style.cssText="font-size:22px;font-weight:800;margin-bottom:6px");
+    area.querySelectorAll(".print-desc").forEach(el=>el.style.cssText="font-size:13px;color:#666;margin-bottom:12px");
+    area.querySelectorAll(".print-meta").forEach(el=>el.style.cssText="font-size:12px;color:#444;margin-bottom:16px;display:flex;gap:16px");
+    area.querySelectorAll(".print-section").forEach(el=>el.style.cssText="font-size:14px;font-weight:700;margin:14px 0 6px;border-bottom:2px solid #FF8A00;padding-bottom:3px;color:#111");
+    area.querySelectorAll(".print-ing-row").forEach(el=>el.style.cssText="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #eee");
+    area.querySelectorAll(".print-step-row").forEach(el=>el.style.cssText="display:flex;gap:8px;margin-bottom:8px;font-size:12px;line-height:1.6");
+    area.querySelectorAll(".print-step-num").forEach(el=>el.style.cssText="min-width:22px;height:22px;border-radius:50%;background:#FF8A00;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0");
+    area.querySelectorAll(".print-footer").forEach(el=>el.style.cssText=forPrint?"margin-top:24px;padding-top:12px;border-top:1px solid #eee;text-align:center":"margin-top:20px;font-size:10px;color:#aaa;text-align:center");
   }
 
-  async function downloadImage() {
-    const { r, si } = getPrintData();
-    showToast("이미지 생성 중...", "");
-    const old = document.getElementById("print-area");
-    if (old) old.remove();
-    const area = buildPrintArea(r, si);
-    area.style.cssText = "position:fixed;top:-9999px;left:0;width:400px;padding:32px;background:white;font-family:sans-serif;color:#111;";
-    area.querySelectorAll(".print-title").forEach(el => el.style.cssText = "font-size:22px;font-weight:800;margin-bottom:6px");
-    area.querySelectorAll(".print-section").forEach(el => el.style.cssText = "font-size:14px;font-weight:700;margin:14px 0 6px;border-bottom:2px solid #FF8A00;padding-bottom:3px;color:#111");
-    area.querySelectorAll(".print-ing-row").forEach(el => el.style.cssText = "display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #eee");
-    area.querySelectorAll(".print-step-row").forEach(el => el.style.cssText = "display:flex;gap:8px;margin-bottom:8px;font-size:12px");
-    area.querySelectorAll(".print-step-num").forEach(el => el.style.cssText = "min-width:22px;height:22px;border-radius:50%;background:#FF8A00;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0");
-    area.querySelectorAll(".print-footer").forEach(el => el.style.cssText = "margin-top:20px;font-size:10px;color:#aaa;text-align:center");
+  function downloadPDF(){
+    const{r,si}=getPrintData();
+    const old=document.getElementById("print-area"); if(old) old.remove();
+    const area=buildPrintArea(r,si);
+    area.style.cssText="position:fixed;top:0;left:0;width:100%;padding:40px;background:white;font-family:sans-serif;color:#111;z-index:9999;";
+    applyPrintStyles(area,true);
     document.body.appendChild(area);
-    try {
-      const canvas = await html2canvas(area, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-      const link = document.createElement("a");
-      link.download = `${r.title||"레시피"}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-      showToast("이미지 저장됐어요!", "success");
-    } catch(e) {
-      showToast("이미지 생성 실패", "error");
-    } finally {
-      area.remove();
-    }
+    document.querySelectorAll(".screen").forEach(s=>s.style.display="none");
+    setTimeout(()=>{window.print();setTimeout(()=>{document.querySelectorAll(".screen").forEach(s=>s.style.display="");document.querySelector(".screen.active").style.display="flex";area.remove();},1000);},300);
   }
 
-  // ── 유틸 ────────────────────────────────────────────────────
+  async function downloadImage(){
+    const{r,si}=getPrintData(); showToast("이미지 생성 중...","");
+    const old=document.getElementById("print-area"); if(old) old.remove();
+    const area=buildPrintArea(r,si);
+    area.style.cssText="position:fixed;top:-9999px;left:0;width:400px;padding:32px;background:white;font-family:sans-serif;color:#111;";
+    applyPrintStyles(area,false);
+    document.body.appendChild(area);
+    try{
+      const canvas=await html2canvas(area,{scale:2,backgroundColor:"#ffffff",useCORS:true});
+      const link=document.createElement("a"); link.download=`${r.title||"레시피"}.png`; link.href=canvas.toDataURL("image/png"); link.click();
+      showToast("이미지 저장됐어요!","success");
+    }catch(e){showToast("이미지 생성 실패","error");}
+    finally{area.remove();}
+  }
+
   function parseAmount(str){if(!str)return null;const m=str.match(/^([\d.]+)/);return m?parseFloat(m[1]):null;}
   function scaleAmount(str,ratio){if(!str)return str;const num=parseAmount(str);if(!num)return str;const s=Math.round(num*ratio*10)/10;return str.replace(/^[\d.]+/,s%1===0?String(s):s.toFixed(1));}
   function scaleNut(val,ratio){const n=parseFloat(val);if(isNaN(n))return val;const s=Math.round(n*ratio*10)/10;return(s%1===0?s:s.toFixed(1))+(val.replace(/[\d.]/g,"")||"");}
 
   let toastTimer=null;
   function showToast(msg,type=""){
-    const t=document.getElementById("toast");
-    t.textContent=msg; t.className=`toast ${type} show`;
-    clearTimeout(toastTimer);
-    toastTimer=setTimeout(()=>t.classList.remove("show"),3000);
+    const t=document.getElementById("toast"); t.textContent=msg; t.className=`toast ${type} show`;
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),3000);
   }
-
-
-document.addEventListener("backbutton", (ev) => {
-  ev.preventDefault();
-  ev.stopPropagation();
-  
-  const overlay = document.getElementById("detail-overlay");
-  if (overlay && (overlay.style.display === "flex" || overlay.style.display === "")) {
-    if (overlay.style.display === "flex") {
-      closeDetail();
-      return;
-    }
-  }
-  
-  const activeScreen = document.querySelector(".screen.active");
-  
-  if (activeScreen?.id === "app") {
-    const activeTab = document.querySelector(".tab-item.active")?.dataset.tab;
-    if (activeTab === "home") {
-      if (confirm("앱을 종료하시겠어요?")) navigator.app?.exitApp();
-    } else {
-      switchTab("home");
-    }
-  } else if (activeScreen?.id === "result-screen") {
-    showScreen("app");
-  } else if (activeScreen?.id === "loading-screen") {
-    clearTimers(); showScreen("app");
-  }
-}, false);
-
 
   init();
 </script>
