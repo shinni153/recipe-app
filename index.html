@@ -577,8 +577,8 @@
     if (session) currentUser = session.user;
 
     sb.auth.onAuthStateChange((event, session) => {
-      if (session) { currentUser = session.user; afterLogin(); showScreen("app"); }
-      else { currentUser = null; showScreen("login"); }
+     if (session) { currentUser = session.user; afterLogin(); showScreen("app"); }
+     else if (event === "SIGNED_OUT") { currentUser = null; showScreen("login"); }
     });
 
     document.getElementById("google-login-btn").addEventListener("click", loginWithGoogle);
@@ -1312,11 +1312,17 @@
     toastTimer=setTimeout(()=>t.classList.remove("show"),3000);
   }
 
+
 document.addEventListener("backbutton", (ev) => {
-  // 상세 오버레이 열려있으면 닫기
-  if (document.getElementById("detail-overlay").style.display === "flex") {
-    closeDetail();
-    return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  
+  const overlay = document.getElementById("detail-overlay");
+  if (overlay && (overlay.style.display === "flex" || overlay.style.display === "")) {
+    if (overlay.style.display === "flex") {
+      closeDetail();
+      return;
+    }
   }
   
   const activeScreen = document.querySelector(".screen.active");
@@ -1324,10 +1330,8 @@ document.addEventListener("backbutton", (ev) => {
   if (activeScreen?.id === "app") {
     const activeTab = document.querySelector(".tab-item.active")?.dataset.tab;
     if (activeTab === "home") {
-      // 홈에서 백버튼 → 앱 종료 확인
       if (confirm("앱을 종료하시겠어요?")) navigator.app?.exitApp();
     } else {
-      // 보관함/설정에서 백버튼 → 홈으로
       switchTab("home");
     }
   } else if (activeScreen?.id === "result-screen") {
