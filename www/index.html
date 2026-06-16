@@ -28,14 +28,13 @@
     .screen { display: none; min-height: 100vh; flex-direction: column; }
     .screen.active { display: flex; }
 
-    /* ── 스플래시 ── */
-    #splash { background: var(--bg); align-items: center; justify-content: center; }
-    .splash-logo { display: flex; flex-direction: column; align-items: center; gap: 16px; animation: fadeIn 0.8s ease; }
-    .splash-icon { width: 100px; height: 100px; background: linear-gradient(135deg, #FF8A00, #FF6B00); border-radius: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 20px 60px rgba(255,138,0,0.4); }
-    .splash-title { font-size: 36px; font-weight: 800; letter-spacing: -1px; }
-    .splash-title span { color: var(--orange); }
-    .splash-subtitle { font-size: 14px; color: var(--gray2); }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    <!-- 스플래시 -->
+   <div id="splash" class="screen active">
+   <div class="splash-logo">
+   <img src="/logo.png" style="width:240px;height:240px;object-fit:contain;">
+    </div>
+    </div>
+
 
     /* ── 온보딩 ── */
     #onboarding { background: var(--bg); }
@@ -569,9 +568,8 @@
   // ── 초기화 ──────────────────────────────────────────────────
   async function init() {
     setTimeout(() => {
-      const seen = localStorage.getItem("rx_onboarded");
-      showScreen(seen ? "login-check" : "onboarding");
-    }, 2000);
+    showScreen("login-check");
+  }, 2000);
 
     const { data: { session } } = await sb.auth.getSession();
     if (session) currentUser = session.user;
