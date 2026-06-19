@@ -301,7 +301,7 @@ app.post("/api/recipe-from-image", async (req, res) => {
           { text: imagePrompt },
           { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } }
         ]}],
-        generationConfig: { temperature: 0.3 }
+        generationConfig: { temperature: 0 }
       })
     });
     const data = await res2.json();
