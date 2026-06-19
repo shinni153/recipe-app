@@ -16,9 +16,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-const RECIPE_PROMPT = `이 유튜브 영상을 분석해서 나오는 레시피를 추출해줘.
-영상 화면에 표시되는 재료 수치, 텍스트, 자막을 모두 읽어서 최대한 정확하게 추출해줘.
+const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
+- 재료 수치는 영상에서 직접 보이는 숫자만 사용할 것
+- 영상에서 확인되지 않은 수치는 절대 추측하거나 만들지 말 것
+- 수치가 불명확하면 "적당량"으로 표시할 것
 
+이 유튜브 영상을 분석해서 나오는 레시피를 추출해줘.
+영상 화면에 표시되는 재료 수치, 텍스트, 자막을 모두 읽어서 최대한 정확하게 추출해줘.
 ## 레시피 분리 기준 (매우 중요)
 독립적인 레시피로 분리할 것:
 - 완성 요리의 핵심이 되는 베이스 (반죽/도우, 육수/브로스, 빵/시트 등)
@@ -89,7 +93,7 @@ async function analyzeVideoWithGemini(youtubeUrl) {
         { text: RECIPE_PROMPT },
         { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
       ]}],
-      generationConfig: { temperature: 0.3 }
+      generationConfig: { temperature: 0 }
     })
   });
   if (!res.ok) {
@@ -114,7 +118,7 @@ async function analyzeTranscriptWithGemini(transcript) {
       contents: [{ parts: [
         { text: `${RECIPE_PROMPT}\n\n자막:\n${transcript.slice(0, 8000)}` }
       ]}],
-      generationConfig: { temperature: 0.3 }
+      generationConfig: { temperature: 0 }
     })
   });
   if (!res.ok) {
