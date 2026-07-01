@@ -55,7 +55,7 @@ const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
   {
     "title": "요리명",
     "description": "한줄 설명",
-    "servings": "인분",
+    "servings": "영상에서 명확히 언급된 인분 수 (불명확하거나 언급 없으면 '1회분')",
     "time": "총 조리시간",
     "ingredients": [{"name": "재료명", "amount": "분량"}],
     "steps": ["1단계 (중간 준비 과정 포함, 상세하게)", "2단계", ...],
