@@ -17,6 +17,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
+- 인분(servings)은 영상에서 직접 확인된 경우만 숫자로, 아니면 반드시 '1회분'으로만 표시
 - 재료 수치는 영상에서 직접 보이는 숫자만 사용할 것
 - 영상에서 확인되지 않은 수치는 절대 추측하거나 만들지 말 것
 - 수치가 불명확하면 "적당량"으로 표시할 것
@@ -55,7 +56,7 @@ const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
   {
     "title": "요리명",
     "description": "한줄 설명",
-    "servings": "영상에서 명확히 언급된 인분 수 (불명확하거나 언급 없으면 '1회분')",
+    "servings": "동영상에서 명확히 언급되거나 확인 가능한 인분 수만 숫자로 표시. 불명확하거나 언급 없으면 반드시 '1회분'으로만 표시. 절대 추측 금지.",
     "time": "총 조리시간",
     "ingredients": [{"name": "재료명", "amount": "분량"}],
     "steps": ["1단계 (중간 준비 과정 포함, 상세하게)", "2단계", ...],
@@ -93,7 +94,7 @@ async function analyzeVideoWithGemini(youtubeUrl) {
         { text: RECIPE_PROMPT },
         { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
       ]}],
-      generationConfig: { temperature: 0 }
+      generationConfig: { temperature: 1 }
     })
   });
   if (!res.ok) {
@@ -106,6 +107,12 @@ async function analyzeVideoWithGemini(youtubeUrl) {
   const clean = text.replace(/```json|```/g, "").trim();
   if (!clean) throw new Error("Gemini 응답이 비어있어요.");
   const parsed = JSON.parse(clean);
+  parsed.forEach(recipe => {
+  const s = String(recipe.servings || '');
+  if (!s || s === 'undefined' || isNaN(parseFloat(s))) {
+    recipe.servings = '1회분';
+  }
+  });
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
@@ -118,7 +125,7 @@ async function analyzeTranscriptWithGemini(transcript) {
       contents: [{ parts: [
         { text: `${RECIPE_PROMPT}\n\n자막:\n${transcript.slice(0, 8000)}` }
       ]}],
-      generationConfig: { temperature: 0 }
+      generationConfig: { temperature: 1 }
     })
   });
   if (!res.ok) {
@@ -130,6 +137,12 @@ async function analyzeTranscriptWithGemini(transcript) {
   const clean = text.replace(/```json|```/g, "").trim();
   if (!clean) throw new Error("Gemini 응답이 비어있어요.");
   const parsed = JSON.parse(clean);
+  parsed.forEach(recipe => {
+  const s = String(recipe.servings || '');
+  if (!s || s === 'undefined' || isNaN(parseFloat(s))) {
+    recipe.servings = '1회분';
+  }
+  });
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
@@ -301,7 +314,7 @@ app.post("/api/recipe-from-image", async (req, res) => {
           { text: imagePrompt },
           { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } }
         ]}],
-        generationConfig: { temperature: 0 }
+        generationConfig: { temperature: 1 }
       })
     });
     const data = await res2.json();
