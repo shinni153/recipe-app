@@ -168,9 +168,10 @@ app.post("/api/extract", async (req, res) => {
 app.post("/api/save-recipe", async (req, res) => {
   const { recipe, category, source_url, thumbnail_url, user_id } = req.body;
   if (!recipe) return res.status(400).json({ error: "레시피가 없어요." });
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
     const { data, error } = await supabase.from("recipes").insert([{
-      user_id:       user_id || "",
+      user_id:       user_id,
       title:         recipe.title,
       description:   recipe.description,
       category:      category || "기타",
@@ -194,9 +195,10 @@ app.post("/api/save-recipe", async (req, res) => {
 
 // ── 레시피 목록 조회 ─────────────────────────────────────────
 app.get("/api/recipes", async (req, res) => {
-  const { category } = req.query;
+  const { category, user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
   try {
-    let query = supabase.from("recipes").select("*").order("created_at", { ascending: false });
+    let query = supabase.from("recipes").select("*").eq("user_id", user_id).order("created_at", { ascending: false });
     if (category === "즐겨찾기") query = query.eq("is_favorite", true);
     else if (category && category !== "전체") query = query.eq("category", category);
     const { data, error } = await query;
@@ -211,6 +213,7 @@ app.get("/api/recipes", async (req, res) => {
 app.put("/api/recipes/:id", async (req, res) => {
   const { id } = req.params;
   const r = req.body;
+  if (!r.user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
     const { data, error } = await supabase.from("recipes").update({
       title:       r.title,
@@ -221,7 +224,7 @@ app.put("/api/recipes/:id", async (req, res) => {
       ingredients: r.ingredients,
       steps:       r.steps,
       nutrition:   r.nutrition
-    }).eq("id", id).select();
+    }).eq("id", id).eq("user_id", r.user_id).select();
     if (error) throw error;
     console.log("✅ 레시피 수정 성공:", r.title);
     res.json({ success: true, data });
@@ -234,11 +237,13 @@ app.put("/api/recipes/:id", async (req, res) => {
 // ── 즐겨찾기 토글 ────────────────────────────────────────────
 app.put("/api/recipes/:id/favorite", async (req, res) => {
   const { id } = req.params;
-  const { is_favorite } = req.body;
+  const { is_favorite, user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
     const { error } = await supabase.from("recipes")
       .update({ is_favorite })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user_id);
     if (error) throw error;
     res.json({ success: true });
   } catch (e) {
@@ -277,8 +282,10 @@ function timeAgo(dateStr) {
 // ── 레시피 삭제 ──────────────────────────────────────────────
 app.delete("/api/recipes/:id", async (req, res) => {
   const { id } = req.params;
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
-    const { error } = await supabase.from("recipes").delete().eq("id", id);
+    const { error } = await supabase.from("recipes").delete().eq("id", id).eq("user_id", user_id);
     if (error) throw error;
     res.json({ success: true });
   } catch (e) {
