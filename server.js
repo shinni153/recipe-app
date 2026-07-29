@@ -78,28 +78,93 @@ function getThumbnailUrl(videoId) {
   return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
 }
 
-// ── 유튜브 설명란(본문) 가져오기 ──────────────────────────────
-async function getVideoDescription(videoId) {
+// ── ISO 8601 duration 파싱 (PT10M49S → 649초) ─────────────────
+function parseDuration(isoDuration) {
+  const match = (isoDuration || "").match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] || 0);
+  const minutes = parseInt(match[2] || 0);
+  const seconds = parseInt(match[3] || 0);
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+// ── 영상 길이 기준 필요 토큰 계산 ──────────────────────────────
+function calculateTokenCost(durationSeconds) {
+  if (durationSeconds <= 180) return 1;   // 3분 이하
+  if (durationSeconds <= 600) return 2;   // 10분 이하
+  if (durationSeconds <= 1200) return 3;  // 20분 이하
+  return 4;                                // 20분 초과
+}
+
+// ── 유튜브 설명란 + 영상 길이 가져오기 ─────────────────────────
+async function getVideoInfo(videoId) {
   if (!YOUTUBE_API_KEY) {
-    console.log("⚠️ YOUTUBE_API_KEY가 없어서 설명란을 가져올 수 없어요.");
-    return "";
+    console.log("⚠️ YOUTUBE_API_KEY가 없어요.");
+    return { description: "", durationSeconds: 0 };
   }
   try {
     const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`
     );
     if (!res.ok) {
       console.log("⚠️ YouTube Data API 오류:", res.status);
-      return "";
+      return { description: "", durationSeconds: 0 };
     }
     const data = await res.json();
-    const description = data.items?.[0]?.snippet?.description || "";
-    console.log("📄 설명란 길이:", description.length, "자");
-    return description;
+    const item = data.items?.[0];
+    const description = item?.snippet?.description || "";
+    const durationSeconds = parseDuration(item?.contentDetails?.duration);
+    console.log("📄 설명란 길이:", description.length, "자 / 영상 길이:", durationSeconds, "초");
+    return { description, durationSeconds };
   } catch (e) {
-    console.log("⚠️ 설명란 가져오기 실패:", e.message);
-    return "";
+    console.log("⚠️ 영상 정보 가져오기 실패:", e.message);
+    return { description: "", durationSeconds: 0 };
   }
+}
+
+// ── KST 기준 오늘 날짜 (YYYY-MM-DD) ────────────────────────────
+function todayKST() {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
+// ── 토큰 잔액 조회 (없으면 생성) ────────────────────────────────
+async function getOrCreateUserTokens(user_id) {
+  let { data, error } = await supabase
+    .from("user_tokens")
+    .select("*")
+    .eq("user_id", user_id)
+    .single();
+
+  if (!data) {
+    const { data: created, error: createError } = await supabase
+      .from("user_tokens")
+      .insert([{ user_id, token_count: 2, last_checkin_date: todayKST(), streak_count: 1 }])
+      .select()
+      .single();
+    if (createError) throw createError;
+    return created;
+  }
+  if (error) throw error;
+  return data;
+}
+
+// ── 토큰 차감 ──────────────────────────────────────────────────
+async function deductTokens(user_id, amount) {
+  const { data, error } = await supabase
+    .from("user_tokens")
+    .select("token_count")
+    .eq("user_id", user_id)
+    .single();
+  if (error) throw error;
+  const newCount = Math.max(0, (data?.token_count || 0) - amount);
+  const { error: updateError } = await supabase
+    .from("user_tokens")
+    .update({ token_count: newCount, updated_at: new Date().toISOString() })
+    .eq("user_id", user_id);
+  if (updateError) throw updateError;
+  return newCount;
 }
 
 // ── Supadata 자막 추출 ───────────────────────────────────────
@@ -185,35 +250,144 @@ async function analyzeTranscriptWithGemini(transcript, description = "") {
   return normalizeServings(result);
 }
 
-// ── 유튜브 레시피 추출 ───────────────────────────────────────
+// ── 유튜브 레시피 추출 (토큰 소모) ─────────────────────────────
 app.post("/api/extract", async (req, res) => {
-  const { url } = req.body;
+  const { url, user_id } = req.body;
   if (!url) return res.status(400).json({ error: "URL이 없어요." });
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+
   const videoId = url.match(/(?:v=|youtu\.be\/|shorts\/)([^&?/]+)/)?.[1];
   if (!videoId) return res.status(400).json({ error: "유효한 유튜브 URL이 아니에요." });
 
   const thumbnailUrl = getThumbnailUrl(videoId);
-  const description = await getVideoDescription(videoId);
+  const { description, durationSeconds } = await getVideoInfo(videoId);
+  const requiredTokens = calculateTokenCost(durationSeconds);
 
+  // 토큰 잔액 먼저 확인
+  let userTokens;
   try {
-    console.log("🎬 Gemini 영상 직접 분석 시도");
-    const recipes = await analyzeVideoWithGemini(url, description);
-    console.log("✅ Gemini 영상 분석 성공! 레시피", recipes.length, "개");
-    return res.json({ recipes, method: "gemini_video", thumbnailUrl });
+    userTokens = await getOrCreateUserTokens(user_id);
   } catch (e) {
-    console.log("❌ Gemini 영상 분석 실패:", e.message);
+    return res.status(500).json({ error: "토큰 정보를 불러오지 못했어요: " + e.message });
   }
 
+  if (userTokens.token_count < requiredTokens) {
+    return res.status(402).json({
+      error: "토큰이 부족해요.",
+      required_tokens: requiredTokens,
+      current_tokens: userTokens.token_count
+    });
+  }
+
+  // 추출 시도 (여기서 실패하면 토큰 차감 안 함)
+  let recipes, method;
   try {
-    console.log("📝 Supadata 자막 추출 시도");
-    const transcript = await getTranscriptSupadata(videoId);
-    console.log("✅ 자막 추출 성공:", transcript.length, "자");
-    const recipes = await analyzeTranscriptWithGemini(transcript, description);
-    console.log("✅ Gemini 분석 성공! 레시피", recipes.length, "개");
-    return res.json({ recipes, method: "transcript", thumbnailUrl });
+    console.log("🎬 Gemini 영상 직접 분석 시도");
+    recipes = await analyzeVideoWithGemini(url, description);
+    method = "gemini_video";
+    console.log("✅ Gemini 영상 분석 성공! 레시피", recipes.length, "개");
   } catch (e) {
-    console.log("❌ 실패:", e.message);
-    return res.status(500).json({ error: "레시피 추출에 실패했어요: " + e.message });
+    console.log("❌ Gemini 영상 분석 실패:", e.message);
+    try {
+      console.log("📝 Supadata 자막 추출 시도");
+      const transcript = await getTranscriptSupadata(videoId);
+      console.log("✅ 자막 추출 성공:", transcript.length, "자");
+      recipes = await analyzeTranscriptWithGemini(transcript, description);
+      method = "transcript";
+      console.log("✅ Gemini 분석 성공! 레시피", recipes.length, "개");
+    } catch (e2) {
+      console.log("❌ 최종 실패:", e2.message);
+      // 실패했으니 토큰 차감 안 하고 그대로 에러 반환
+      return res.status(500).json({ error: "레시피 추출에 실패했어요: " + e2.message });
+    }
+  }
+
+  // 여기까지 왔으면 추출 성공 → 토큰 차감 (클라이언트가 중간에 꺼도 여기까지 실행되면 차감됨)
+  let remainingTokens;
+  try {
+    remainingTokens = await deductTokens(user_id, requiredTokens);
+  } catch (e) {
+    console.log("⚠️ 토큰 차감 실패 (추출은 성공):", e.message);
+    remainingTokens = userTokens.token_count; // 차감 실패해도 결과는 반환
+  }
+
+  return res.json({
+    recipes,
+    method,
+    thumbnailUrl,
+    tokens_used: requiredTokens,
+    remaining_tokens: remainingTokens
+  });
+});
+
+// ── 토큰 잔액 조회 ───────────────────────────────────────────
+app.get("/api/tokens", async (req, res) => {
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
+  try {
+    const tokens = await getOrCreateUserTokens(user_id);
+    res.json(tokens);
+  } catch (e) {
+    res.status(500).json({ error: "토큰 조회 실패: " + e.message });
+  }
+});
+
+// ── 출석 체크인 (하루 1회, 2토큰 지급) ─────────────────────────
+app.post("/api/checkin", async (req, res) => {
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
+  try {
+    const tokens = await getOrCreateUserTokens(user_id);
+    const today = todayKST();
+
+    if (tokens.last_checkin_date === today) {
+      return res.json({ ...tokens, already_checked_in: true });
+    }
+
+    // 연속 출석 계산 (어제 출석했으면 +1, 아니면 1로 리셋)
+    const yesterday = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    const newStreak = tokens.last_checkin_date === yesterdayStr ? tokens.streak_count + 1 : 1;
+
+    const { data, error } = await supabase
+      .from("user_tokens")
+      .update({
+        token_count: tokens.token_count + 2,
+        last_checkin_date: today,
+        streak_count: newStreak,
+        updated_at: new Date().toISOString()
+      })
+      .eq("user_id", user_id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.json({ ...data, already_checked_in: false, tokens_earned: 2 });
+  } catch (e) {
+    res.status(500).json({ error: "출석 체크 실패: " + e.message });
+  }
+});
+
+// ── 광고 시청 후 토큰 지급 (+1, 무제한) ────────────────────────
+app.post("/api/tokens/watch-ad", async (req, res) => {
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
+  try {
+    const tokens = await getOrCreateUserTokens(user_id);
+    const { data, error } = await supabase
+      .from("user_tokens")
+      .update({
+        token_count: tokens.token_count + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq("user_id", user_id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ ...data, tokens_earned: 1 });
+  } catch (e) {
+    res.status(500).json({ error: "토큰 지급 실패: " + e.message });
   }
 });
 
