@@ -19,17 +19,18 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
 - 인분(servings)은 영상에서 직접 확인된 경우만 숫자로, 아니면 반드시 '1회분'으로만 표시
-- 재료 수치는 영상 화면 또는 아래 제공되는 "유튜브 설명란" 중 하나에서 확인된 숫자만 사용할 것
-- 영상에서도, 설명란에서도 확인되지 않은 수치는 절대 추측하거나 만들지 말 것
+- 재료 수치는 아래 정보들 중에서 확인된 숫자만 사용할 것
+- 어디에서도 확인되지 않은 수치는 절대 추측하거나 만들지 말 것
 - 수치가 불명확하면 "적당량"으로 표시할 것
 
 ## 재료 수치 우선순위 (매우 중요)
-1. "유튜브 설명란" 텍스트에 재료와 정확한 수치가 적혀있으면 그것을 최우선으로 사용할 것 (영상 화면 수치보다 우선)
-2. 설명란에 없거나 설명란이 비어있으면 영상 화면에 보이는 수치를 사용할 것
-3. 둘 다 없으면 "적당량"으로 표시할 것
+1. "유튜브 설명란" 텍스트에 재료와 정확한 수치가 적혀있으면 그것을 최우선으로 사용할 것
+2. 설명란에 없으면 영상 화면에 보이는 수치를 사용할 것
+3. 설명란과 화면 둘 다 없을 때만, "상위 댓글" 중 작성자(보통 영상 제작자)가 직접 남긴 것으로 보이는 정확한 계량 정보를 참고할 것. 단, 댓글은 신뢰도가 낮으니 명확한 수치(예: "밀가루 200g")가 있을 때만 사용하고, 애매하면 무시할 것
+4. 위 어디에도 없으면 "적당량"으로 표시할 것
 
 이 유튜브 영상을 분석해서 나오는 레시피를 추출해줘.
-영상 화면에 표시되는 재료 수치, 텍스트, 자막을 모두 읽고, 아래 제공되는 유튜브 설명란도 함께 참고해서 최대한 정확하게 추출해줘.
+영상 화면에 표시되는 재료 수치, 텍스트, 자막을 모두 읽고, 아래 제공되는 유튜브 설명란과 상위 댓글도 함께 참고해서 최대한 정확하게 추출해줘.
 ## 레시피 분리 기준 (매우 중요)
 독립적인 레시피로 분리할 것:
 - 완성 요리의 핵심이 되는 베이스 (반죽/도우, 육수/브로스, 빵/시트 등)
@@ -62,7 +63,7 @@ const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
   {
     "title": "요리명",
     "description": "한줄 설명",
-    "servings": "동영상 또는 설명란에서 명확히 언급되거나 확인 가능한 인분 수만 숫자로 표시. 불명확하거나 언급 없으면 반드시 '1회분'으로만 표시. 절대 추측 금지.",
+    "servings": "동영상, 설명란, 댓글 중에서 명확히 확인 가능한 인분 수만 숫자로 표시. 불명확하거나 언급 없으면 반드시 '1회분'으로만 표시. 절대 추측 금지.",
     "time": "총 조리시간",
     "ingredients": [{"name": "재료명", "amount": "분량"}],
     "steps": ["1단계 (중간 준비 과정 포함, 상세하게)", "2단계", ...],
@@ -119,6 +120,29 @@ async function getVideoInfo(videoId) {
   } catch (e) {
     console.log("⚠️ 영상 정보 가져오기 실패:", e.message);
     return { description: "", durationSeconds: 0 };
+  }
+}
+
+// ── 상위 댓글 가져오기 (관련성순 상위 2개) ─────────────────────
+async function getTopComments(videoId, maxResults = 2) {
+  if (!YOUTUBE_API_KEY) return "";
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=${maxResults}&order=relevance&key=${YOUTUBE_API_KEY}`
+    );
+    if (!res.ok) {
+      console.log("⚠️ 댓글 가져오기 실패 (또는 댓글 사용 안함):", res.status);
+      return "";
+    }
+    const data = await res.json();
+    const comments = (data.items || [])
+      .map(item => item.snippet.topLevelComment.snippet.textDisplay)
+      .filter(Boolean);
+    console.log("💬 상위 댓글", comments.length, "개 가져옴");
+    return comments.join("\n---\n");
+  } catch (e) {
+    console.log("⚠️ 댓글 가져오기 실패:", e.message);
+    return "";
   }
 }
 
@@ -190,18 +214,27 @@ function normalizeServings(parsed) {
   return parsed;
 }
 
-// ── Gemini 영상 직접 분석 (+설명란 참고) ──────────────────────
-async function analyzeVideoWithGemini(youtubeUrl, description = "") {
-  const descriptionBlock = description
+// ── 설명란/댓글 참고 블록 만들기 ────────────────────────────────
+function buildReferenceBlock(description, comments) {
+  const descBlock = description
     ? `\n\n## 유튜브 설명란 (본문)\n${description.slice(0, 4000)}`
     : `\n\n## 유튜브 설명란 (본문)\n(설명란 정보 없음)`;
+  const commentBlock = comments
+    ? `\n\n## 상위 댓글 (참고용, 신뢰도 낮음 - 명확한 수치만 참고)\n${comments.slice(0, 2000)}`
+    : `\n\n## 상위 댓글\n(댓글 정보 없음)`;
+  return descBlock + commentBlock;
+}
+
+// ── Gemini 영상 직접 분석 (+설명란/댓글 참고) ──────────────────
+async function analyzeVideoWithGemini(youtubeUrl, description = "", comments = "") {
+  const referenceBlock = buildReferenceBlock(description, comments);
 
   const res = await fetch(GEMINI_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [
-        { text: RECIPE_PROMPT + descriptionBlock },
+        { text: RECIPE_PROMPT + referenceBlock },
         { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
       ]}],
       generationConfig: { temperature: 1 }
@@ -221,18 +254,16 @@ async function analyzeVideoWithGemini(youtubeUrl, description = "") {
   return normalizeServings(result);
 }
 
-// ── Gemini 자막 텍스트 분석 (+설명란 참고) ─────────────────────
-async function analyzeTranscriptWithGemini(transcript, description = "") {
-  const descriptionBlock = description
-    ? `\n\n## 유튜브 설명란 (본문)\n${description.slice(0, 4000)}`
-    : `\n\n## 유튜브 설명란 (본문)\n(설명란 정보 없음)`;
+// ── Gemini 자막 텍스트 분석 (+설명란/댓글 참고) ─────────────────
+async function analyzeTranscriptWithGemini(transcript, description = "", comments = "") {
+  const referenceBlock = buildReferenceBlock(description, comments);
 
   const res = await fetch(GEMINI_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [
-        { text: `${RECIPE_PROMPT}${descriptionBlock}\n\n자막:\n${transcript.slice(0, 8000)}` }
+        { text: `${RECIPE_PROMPT}${referenceBlock}\n\n자막:\n${transcript.slice(0, 8000)}` }
       ]}],
       generationConfig: { temperature: 1 }
     })
@@ -260,7 +291,10 @@ app.post("/api/extract", async (req, res) => {
   if (!videoId) return res.status(400).json({ error: "유효한 유튜브 URL이 아니에요." });
 
   const thumbnailUrl = getThumbnailUrl(videoId);
-  const { description, durationSeconds } = await getVideoInfo(videoId);
+  const [{ description, durationSeconds }, comments] = await Promise.all([
+    getVideoInfo(videoId),
+    getTopComments(videoId, 2)
+  ]);
   const requiredTokens = calculateTokenCost(durationSeconds);
 
   // 토큰 잔액 먼저 확인
@@ -283,7 +317,7 @@ app.post("/api/extract", async (req, res) => {
   let recipes, method;
   try {
     console.log("🎬 Gemini 영상 직접 분석 시도");
-    recipes = await analyzeVideoWithGemini(url, description);
+    recipes = await analyzeVideoWithGemini(url, description, comments);
     method = "gemini_video";
     console.log("✅ Gemini 영상 분석 성공! 레시피", recipes.length, "개");
   } catch (e) {
@@ -292,23 +326,22 @@ app.post("/api/extract", async (req, res) => {
       console.log("📝 Supadata 자막 추출 시도");
       const transcript = await getTranscriptSupadata(videoId);
       console.log("✅ 자막 추출 성공:", transcript.length, "자");
-      recipes = await analyzeTranscriptWithGemini(transcript, description);
+      recipes = await analyzeTranscriptWithGemini(transcript, description, comments);
       method = "transcript";
       console.log("✅ Gemini 분석 성공! 레시피", recipes.length, "개");
     } catch (e2) {
       console.log("❌ 최종 실패:", e2.message);
-      // 실패했으니 토큰 차감 안 하고 그대로 에러 반환
       return res.status(500).json({ error: "레시피 추출에 실패했어요: " + e2.message });
     }
   }
 
-  // 여기까지 왔으면 추출 성공 → 토큰 차감 (클라이언트가 중간에 꺼도 여기까지 실행되면 차감됨)
+  // 여기까지 왔으면 추출 성공 → 토큰 차감
   let remainingTokens;
   try {
     remainingTokens = await deductTokens(user_id, requiredTokens);
   } catch (e) {
     console.log("⚠️ 토큰 차감 실패 (추출은 성공):", e.message);
-    remainingTokens = userTokens.token_count; // 차감 실패해도 결과는 반환
+    remainingTokens = userTokens.token_count;
   }
 
   return res.json({
@@ -344,7 +377,6 @@ app.post("/api/checkin", async (req, res) => {
       return res.json({ ...tokens, already_checked_in: true });
     }
 
-    // 연속 출석 계산 (어제 출석했으면 +1, 아니면 1로 리셋)
     const yesterday = new Date(Date.now() + 9 * 60 * 60 * 1000);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
