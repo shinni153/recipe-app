@@ -807,19 +807,14 @@ ${text.slice(0, 12000)}`;
   }
 });
 
-// ── 날짜 라벨(YYYY.MM.DD, "버전1", "20XX.MM.DD" 등)을 정렬 가능한 날짜로 변환 ──
-function labelToSortableDate(label, fallbackIndex) {
+// ── 날짜 라벨(YYYY.MM.DD, "20XX.MM.DD" 등)에서 실제 날짜만 추출 ──
+function parseLabelDate(label) {
   const m = String(label || '').match(/(\d{4}|\d{2}|20XX)\.(\d{1,2})\.(\d{1,2})/);
-  if (m) {
-    let yy = m[1];
-    if (yy === '20XX') yy = '2020'; // 세기 불명확한 경우 임시로 2020대 취급 (정렬용)
-    else if (yy.length === 2) yy = '20' + yy;
-    return `${yy}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-  }
-  // "버전1", "버전19" 등 순번만 있는 경우 → 임시 정렬용 날짜
-  const base = new Date('2019-01-01');
-  base.setDate(base.getDate() + fallbackIndex);
-  return base.toISOString().slice(0, 10);
+  if (!m) return null;
+  let yy = m[1];
+  if (yy === '20XX') yy = '2020';
+  else if (yy.length === 2) yy = '20' + yy;
+  return `${yy}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
 }
 
 // ── 🤖 자유형식 파싱 결과 → 실제 메뉴개발노트로 저장 ──────────────
@@ -843,6 +838,7 @@ app.post("/api/menu/save-freeform", async (req, res) => {
     await supabase.from("launch_checklists").insert([{ menu_item_id: menu.id }]);
 
     let prevIngredients = null;
+    let lastDate = '2019-12-31'; // 최초 날짜 없는 항목의 기준점
     const insertedVersions = [];
     for (let i = 0; i < versions.length; i++) {
       const v = versions[i];
@@ -850,9 +846,19 @@ app.post("/api/menu/save-freeform", async (req, res) => {
         name: ing.name, amount: parseFloat(ing.amount) || 0, unit: ing.unit || "", costPerUnit: 0
       }));
       const tags = detectChangeTags(prevIngredients, [], ingredients, []);
+
+      let versionDate = parseLabelDate(v.label);
+      if (!versionDate) {
+        // 날짜를 못 찾은 라벨(예: "버전1")은 바로 이전 버전 다음날로 배치해서 순서 유지
+        const nd = new Date(lastDate + "T00:00:00");
+        nd.setDate(nd.getDate() + 1);
+        versionDate = nd.toISOString().slice(0, 10);
+      }
+      lastDate = versionDate;
+
       const { data: verData, error: verErr } = await supabase.from("base_versions").insert([{
         base_id: base.id,
-        version_date: labelToSortableDate(v.label, i),
+        version_date: versionDate,
         display_label: v.label,
         ingredients, process_steps: [], change_tags: tags
       }]).select().single();
