@@ -753,7 +753,10 @@ app.put("/api/menu/:menuId/checklist", async (req, res) => {
 
 // ── 🤖 자유 형식 레시피 노트 → Gemini 실제 파싱 (프로토타입의 진짜 버전) ──
 app.post("/api/menu/parse-freeform", async (req, res) => {
-  const { text } = req.body;
+  let text = req.body?.text;
+  console.log("📥 parse-freeform 수신 타입:", typeof text, Array.isArray(text) ? `(배열, 길이 ${text.length})` : "");
+  if (Array.isArray(text)) text = text.join("\n");
+  if (typeof text !== "string") text = text ? JSON.stringify(text) : "";
   if (!text) return res.status(400).json({ error: "텍스트가 없어요." });
 
   const PARSE_PROMPT = `아래는 요식업 종사자가 몇 년에 걸쳐 자유롭게 적어온 레시피 개발 노트야.
