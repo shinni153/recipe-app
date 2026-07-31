@@ -807,4 +807,64 @@ ${text.slice(0, 12000)}`;
   }
 });
 
+// ── 날짜 라벨(YYYY.MM.DD, "버전1", "20XX.MM.DD" 등)을 정렬 가능한 날짜로 변환 ──
+function labelToSortableDate(label, fallbackIndex) {
+  const m = String(label || '').match(/(\d{4}|\d{2}|20XX)\.(\d{1,2})\.(\d{1,2})/);
+  if (m) {
+    let yy = m[1];
+    if (yy === '20XX') yy = '2020'; // 세기 불명확한 경우 임시로 2020대 취급 (정렬용)
+    else if (yy.length === 2) yy = '20' + yy;
+    return `${yy}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  }
+  // "버전1", "버전19" 등 순번만 있는 경우 → 임시 정렬용 날짜
+  const base = new Date('2019-01-01');
+  base.setDate(base.getDate() + fallbackIndex);
+  return base.toISOString().slice(0, 10);
+}
+
+// ── 🤖 자유형식 파싱 결과 → 실제 메뉴개발노트로 저장 ──────────────
+app.post("/api/menu/save-freeform", async (req, res) => {
+  const { user_id, menu_name, versions } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  if (!menu_name) return res.status(400).json({ error: "메뉴명이 없어요." });
+  if (!Array.isArray(versions) || versions.length === 0) return res.status(400).json({ error: "저장할 버전이 없어요." });
+
+  try {
+    const { data: menu, error: menuErr } = await supabase.from("menu_items")
+      .insert([{ user_id, name: menu_name, target_cost_ratio: 30 }])
+      .select().single();
+    if (menuErr) throw menuErr;
+
+    const { data: base, error: baseErr } = await supabase.from("menu_bases")
+      .insert([{ menu_item_id: menu.id, name: menu_name + " 베이스" }])
+      .select().single();
+    if (baseErr) throw baseErr;
+
+    await supabase.from("launch_checklists").insert([{ menu_item_id: menu.id }]);
+
+    let prevIngredients = null;
+    const insertedVersions = [];
+    for (let i = 0; i < versions.length; i++) {
+      const v = versions[i];
+      const ingredients = (v.ingredients || []).map(ing => ({
+        name: ing.name, amount: parseFloat(ing.amount) || 0, unit: ing.unit || "", costPerUnit: 0
+      }));
+      const tags = detectChangeTags(prevIngredients, [], ingredients, []);
+      const { data: verData, error: verErr } = await supabase.from("base_versions").insert([{
+        base_id: base.id,
+        version_date: labelToSortableDate(v.label, i),
+        display_label: v.label,
+        ingredients, process_steps: [], change_tags: tags
+      }]).select().single();
+      if (verErr) throw verErr;
+      insertedVersions.push(verData);
+      prevIngredients = ingredients;
+    }
+
+    res.json({ success: true, menu, base, version_count: insertedVersions.length });
+  } catch (e) {
+    res.status(500).json({ error: "저장 실패: " + e.message });
+  }
+});
+
 app.listen(3000, () => console.log("✅ 서버 실행 중: http://localhost:3000"));
