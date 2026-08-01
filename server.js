@@ -56,6 +56,21 @@ const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
 - 완성 요리 레시피: 해당 요리 기준 인분으로 표시
 - 각 완성 요리에는 베이스 재료도 포함해서 처음부터 끝까지 만들 수 있게 해줘
 
+## 필요 도구 태깅 (매우 중요)
+이 레시피에 필요한 도구를 아래 마스터 리스트에서만 골라 배열로 반환할 것.
+리스트에 없는 도구가 필요하면 배열에 넣지 말고 required_tools_freetext에 원문 그대로 적을 것.
+필요한 도구가 하나도 없으면 required_tools는 빈 배열로.
+
+도구 마스터 리스트:
+oven, air_fryer, microwave, induction, thermometer, stand_mixer, hand_mixer,
+dough_kneader, whisk, blender, food_processor, kitchen_scale, measuring_cup,
+fridge_freezer, piping_bag, silicone_mold, rolling_pin, sieve, spatula,
+parchment_paper, pressure_cooker, earthenware_pot, steamer, grill_pan,
+mortar_pestle, wok, cleaver, bamboo_steamer, ladle, rice_cooker, sushi_mat,
+donabe, japanese_knife, mandoline_slicer
+
+required_ingredients_special과 required_ingredients_freetext는 지금은 항상 빈 배열/null로 반환할 것 (재료 마스터 리스트 준비 전).
+
 ## 출력 형식
 반드시 JSON 배열만 반환. 다른 텍스트 없이 JSON만.
 
@@ -67,7 +82,11 @@ const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
     "time": "총 조리시간",
     "ingredients": [{"name": "재료명", "amount": "분량"}],
     "steps": ["1단계 (중간 준비 과정 포함, 상세하게)", "2단계", ...],
-    "nutrition": {"calories": "kcal", "carbs": "g", "protein": "g", "fat": "g"}
+    "nutrition": {"calories": "kcal", "carbs": "g", "protein": "g", "fat": "g"},
+    "required_tools": ["stand_mixer", "oven"],
+    "required_tools_freetext": null,
+    "required_ingredients_special": [],
+    "required_ingredients_freetext": null
   }
 ]
 
@@ -348,7 +367,9 @@ app.post("/api/save-recipe", async (req, res) => {
     const { data, error } = await supabase.from("recipes").insert([{
       user_id, title: recipe.title, description: recipe.description, category: category || "기타",
       servings: recipe.servings, time: recipe.time, ingredients: recipe.ingredients, steps: recipe.steps,
-      nutrition: recipe.nutrition, source_url: source_url || "", thumbnail_url: thumbnail_url || ""
+      nutrition: recipe.nutrition, source_url: source_url || "", thumbnail_url: thumbnail_url || "",
+      required_tools: recipe.required_tools || [], required_tools_freetext: recipe.required_tools_freetext || null,
+      required_ingredients_special: recipe.required_ingredients_special || [], required_ingredients_freetext: recipe.required_ingredients_freetext || null
     }]).select();
     if (error) throw error;
     res.json({ success: true, data });
@@ -398,6 +419,70 @@ app.put("/api/recipes/:id/favorite", async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "즐겨찾기 실패: " + e.message });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   🔧 쿠킹모드 도구 체크 API
+   ══════════════════════════════════════════════════════════════════ */
+
+// ── 보유 도구 전체 조회 ───────────────────────────────────────
+app.get("/api/tools", async (req, res) => {
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
+  try {
+    const { data, error } = await supabase.from("user_tools").select("*").eq("user_id", user_id);
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "도구 조회 실패: " + e.message });
+  }
+});
+
+// ── 온보딩/설정에서 체크한 도구 전체를 한번에 upsert ──────────────
+app.put("/api/tools", async (req, res) => {
+  const { user_id, tools } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  if (!Array.isArray(tools)) return res.status(400).json({ error: "tools 배열이 필요해요." });
+  try {
+    const rows = tools.map(t => ({
+      user_id, tool_key: t.tool_key, has_it: t.has_it,
+      power_tier: t.power_tier || null, note: t.note || null,
+      updated_at: new Date().toISOString()
+    }));
+    const { data, error } = await supabase.from("user_tools")
+      .upsert(rows, { onConflict: "user_id,tool_key" }).select();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "도구 저장 실패: " + e.message });
+  }
+});
+
+// ── 레시피 필요 도구 vs 보유 도구 대조 ─────────────────────────
+app.get("/api/recipes/:id/tool-check", async (req, res) => {
+  const { id } = req.params;
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  try {
+    const { data: recipe, error: recipeErr } = await supabase.from("recipes")
+      .select("required_tools, required_tools_freetext").eq("id", id).single();
+    if (recipeErr) throw recipeErr;
+
+    const { data: owned, error: toolsErr } = await supabase.from("user_tools")
+      .select("tool_key, has_it, power_tier").eq("user_id", user_id);
+    if (toolsErr) throw toolsErr;
+
+    const ownedMap = Object.fromEntries((owned || []).map(o => [o.tool_key, o]));
+    const result = (recipe.required_tools || []).map(key => ({
+      tool_key: key,
+      has_it: ownedMap[key]?.has_it ?? false,
+      power_tier: ownedMap[key]?.power_tier ?? null
+    }));
+
+    res.json({ tools: result, freetext: recipe.required_tools_freetext });
+  } catch (e) {
+    res.status(500).json({ error: "도구 대조 실패: " + e.message });
   }
 });
 
