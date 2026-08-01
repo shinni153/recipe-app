@@ -93,6 +93,19 @@ required_ingredients_special과 required_ingredients_freetext는 지금은 항�
 nutrition은 재료 기반으로 반드시 예상 수치를 계산해서 실제 숫자로 채워줘. N/A 금지.
 steps는 최소 8단계 이상, 베이스 만들기부터 완성까지 전체 과정 상세하게.`;
 
+// ── 도구 key → 한글 라벨 (대체법 프롬프트용) ───────────────────
+const TOOL_LABEL_MAP_KO = {
+  oven: "오븐", air_fryer: "에어프라이어", microwave: "전자레인지", induction: "인덕션/가스레인지",
+  thermometer: "온도계", stand_mixer: "스탠드믹서", hand_mixer: "핸드믹서", dough_kneader: "반죽기",
+  whisk: "거품기", blender: "블렌더/믹서기", food_processor: "푸드프로세서", kitchen_scale: "계량저울",
+  measuring_cup: "계량컵/스푼", fridge_freezer: "냉장/냉동고", piping_bag: "짤주머니",
+  silicone_mold: "실리콘틀", rolling_pin: "밀대", sieve: "체", spatula: "스패출러/주걱",
+  parchment_paper: "유산지", pressure_cooker: "압력밥솥", earthenware_pot: "뚝배기", steamer: "찜기",
+  grill_pan: "불판/그릴팬", mortar_pestle: "절구", wok: "웍", cleaver: "중식칼",
+  bamboo_steamer: "대나무찜기", ladle: "중식국자", rice_cooker: "전기밥솥", sushi_mat: "김발",
+  donabe: "도나베", japanese_knife: "일식칼", mandoline_slicer: "채칼/만돌린",
+};
+
 // ── 유튜브 썸네일 URL 생성 ───────────────────────────────────
 function getThumbnailUrl(videoId) {
   return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
@@ -483,6 +496,62 @@ app.get("/api/recipes/:id/tool-check", async (req, res) => {
     res.json({ tools: result, freetext: recipe.required_tools_freetext });
   } catch (e) {
     res.status(500).json({ error: "도구 대조 실패: " + e.message });
+  }
+});
+
+// ── 대체법 조회 (캐시 우선, 신규/캐시 무관하게 토큰 1개 차감) ──────
+app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
+  const { id } = req.params;
+  const { user_id, missing_tool_key } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  if (!missing_tool_key) return res.status(400).json({ error: "missing_tool_key가 없어요." });
+
+  try {
+    const userTokens = await getOrCreateUserTokens(user_id);
+    if (userTokens.token_count < 1) {
+      return res.status(402).json({ error: "토큰이 부족해요.", required_tokens: 1, current_tokens: userTokens.token_count });
+    }
+
+    const { data: recipe, error: recipeErr } = await supabase.from("recipes")
+      .select("title, ingredients, steps").eq("id", id).single();
+    if (recipeErr || !recipe) return res.status(404).json({ error: "레시피를 찾을 수 없어요." });
+
+    const { data: cached } = await supabase.from("tool_alternatives")
+      .select("alternative_text").eq("recipe_id", id).eq("tool_key", missing_tool_key).single();
+
+    let alternative;
+    if (cached) {
+      alternative = cached.alternative_text;
+    } else {
+      const prompt = `레시피 "${recipe.title}"를 만드는데 "${TOOL_LABEL_MAP_KO[missing_tool_key] || missing_tool_key}"이(가) 없어요.
+이 도구 없이 만들 수 있는 대체 방법을 2~3문장으로 간결하게 알려줘. 다른 텍스트 없이 대체 방법 설명만 반환해줘.
+
+재료: ${JSON.stringify(recipe.ingredients || [])}
+조리 과정: ${JSON.stringify(recipe.steps || [])}`;
+
+      const res2 = await fetch(GEMINI_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4 }
+        })
+      });
+      if (!res2.ok) {
+        const err = await res2.json();
+        throw new Error(JSON.stringify(err?.error?.message || err));
+      }
+      const data = await res2.json();
+      alternative = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      if (!alternative) throw new Error("Gemini 응답이 비어있어요.");
+
+      await supabase.from("tool_alternatives")
+        .insert([{ recipe_id: id, tool_key: missing_tool_key, alternative_text: alternative }]);
+    }
+
+    const remainingTokens = await deductTokens(user_id, 1);
+    res.json({ alternative, remaining_tokens: remainingTokens });
+  } catch (e) {
+    res.status(500).json({ error: "대체법 조회 실패: " + e.message });
   }
 });
 
