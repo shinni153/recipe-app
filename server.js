@@ -116,6 +116,17 @@ const TOOL_LABEL_MAP_KO = {
   donabe: "도나베", japanese_knife: "일식칼", mandoline_slicer: "채칼/만돌린",
 };
 
+// ── 특수재료 key → 한글 라벨 (대체법 프롬프트용) ───────────────
+const INGREDIENT_LABEL_MAP_KO = {
+  mascarpone: "마스카포네", cream_cheese: "크림치즈", heavy_cream: "헤비크림",
+  sour_cream: "사워크림", ricotta: "리코타치즈",
+  dark_chocolate: "다크초콜릿", white_chocolate: "화이트초콜릿", cocoa_powder: "코코아파우더",
+  pistachio_paste: "피스타치오 페이스트", almond_flour: "아몬드가루", hazelnut_praline: "헤이즐넛 프랄린",
+  rum: "럼", brandy: "브랜디", coffee_liqueur: "커피 리큐르",
+  gelatin: "젤라틴", vanilla_bean: "바닐라빈", instant_yeast: "인스턴트 이스트",
+  doubanjiang: "두반장", oyster_sauce: "굴소스", mirin: "미림",
+};
+
 // ── 유튜브 썸네일 URL 생성 ───────────────────────────────────
 function getThumbnailUrl(videoId) {
   return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
@@ -572,9 +583,11 @@ app.get("/api/recipes/:id/tool-check", async (req, res) => {
 // ── 대체법 조회 (캐시 우선, 신규/캐시 무관하게 토큰 1개 차감) ──────
 app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
   const { id } = req.params;
-  const { user_id, missing_tool_key } = req.body;
+  const { user_id, kind } = req.body;
+  const missingKey = req.body.missing_key || req.body.missing_tool_key; // missing_tool_key는 하위호환용
+  const itemKind = kind === "ingredient" ? "ingredient" : "tool"; // 기본값 tool (하위호환)
   if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
-  if (!missing_tool_key) return res.status(400).json({ error: "missing_tool_key가 없어요." });
+  if (!missingKey) return res.status(400).json({ error: "missing_key가 없어요." });
 
   try {
     const userTokens = await getOrCreateUserTokens(user_id);
@@ -587,13 +600,22 @@ app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
     if (recipeErr || !recipe) return res.status(404).json({ error: "레시피를 찾을 수 없어요." });
 
     const { data: cached } = await supabase.from("tool_alternatives")
-      .select("alternative_text").eq("recipe_id", id).eq("tool_key", missing_tool_key).single();
+      .select("alternative_text").eq("recipe_id", id).eq("kind", itemKind).eq("tool_key", missingKey).single();
+
+    const labelMap = itemKind === "ingredient" ? INGREDIENT_LABEL_MAP_KO : TOOL_LABEL_MAP_KO;
+    const koLabel = labelMap[missingKey] || missingKey;
 
     let alternative;
     if (cached) {
       alternative = cached.alternative_text;
     } else {
-      const prompt = `레시피 "${recipe.title}"를 만드는데 "${TOOL_LABEL_MAP_KO[missing_tool_key] || missing_tool_key}"이(가) 없어요.
+      const prompt = itemKind === "ingredient"
+        ? `레시피 "${recipe.title}"를 만드는데 "${koLabel}"이(가) 없어요.
+이 재료 없이 만들거나 다른 재료로 대체하는 방법을 2~3문장으로 간결하게 알려줘. 다른 텍스트 없이 대체 방법 설명만 반환해줘.
+
+재료: ${JSON.stringify(recipe.ingredients || [])}
+조리 과정: ${JSON.stringify(recipe.steps || [])}`
+        : `레시피 "${recipe.title}"를 만드는데 "${koLabel}"이(가) 없어요.
 이 도구 없이 만들 수 있는 대체 방법을 2~3문장으로 간결하게 알려줘. 다른 텍스트 없이 대체 방법 설명만 반환해줘.
 
 재료: ${JSON.stringify(recipe.ingredients || [])}
@@ -615,7 +637,7 @@ app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
       if (!alternative) throw new Error("Gemini 응답이 비어있어요.");
 
       await supabase.from("tool_alternatives")
-        .insert([{ recipe_id: id, tool_key: missing_tool_key, alternative_text: alternative }]);
+        .insert([{ recipe_id: id, kind: itemKind, tool_key: missingKey, alternative_text: alternative }]);
     }
 
     const remainingTokens = await deductTokens(user_id, 1);
