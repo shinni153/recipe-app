@@ -5,7 +5,7 @@ const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "100mb" }));
 
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -137,6 +137,51 @@ function calculateTokenCost(durationSeconds) {
   if (durationSeconds <= 600) return 2;
   if (durationSeconds <= 1200) return 3;
   return 4;
+}
+
+// ── mp4/mov 파일의 moov.mvhd 박스만 읽어서 영상 길이(초) 계산 ──
+// 외부 패키지/ffmpeg 불필요, ISO/IEC 14496-12 박스 구조를 직접 파싱
+function getMp4DurationSeconds(buffer) {
+  function findBox(buf, boxType, start, end) {
+    let offset = start;
+    while (offset + 8 <= end) {
+      let size = buf.readUInt32BE(offset);
+      const type = buf.toString("ascii", offset + 4, offset + 8);
+      let headerSize = 8;
+      if (size === 1) {
+        const high = buf.readUInt32BE(offset + 8);
+        const low = buf.readUInt32BE(offset + 12);
+        size = high * 2 ** 32 + low;
+        headerSize = 16;
+      } else if (size === 0) {
+        size = end - offset;
+      }
+      if (type === boxType) return { start: offset, headerSize, size };
+      if (size <= 0) break; // 손상된 파일 방지
+      offset += size;
+    }
+    return null;
+  }
+
+  const moov = findBox(buffer, "moov", 0, buffer.length);
+  if (!moov) throw new Error("moov 박스를 찾을 수 없어요");
+  const mvhd = findBox(buffer, "mvhd", moov.start + moov.headerSize, moov.start + moov.size);
+  if (!mvhd) throw new Error("mvhd 박스를 찾을 수 없어요");
+
+  const base = mvhd.start + mvhd.headerSize;
+  const version = buffer.readUInt8(base);
+  let timescale, duration;
+  if (version === 1) {
+    timescale = buffer.readUInt32BE(base + 20);
+    const high = buffer.readUInt32BE(base + 24);
+    const low = buffer.readUInt32BE(base + 28);
+    duration = high * 2 ** 32 + low;
+  } else {
+    timescale = buffer.readUInt32BE(base + 12);
+    duration = buffer.readUInt32BE(base + 16);
+  }
+  if (!timescale) throw new Error("timescale이 0이에요");
+  return duration / timescale;
 }
 
 // ── 유튜브 설명란 + 영상 길이 가져오기 ─────────────────────────
@@ -667,6 +712,69 @@ app.post("/api/recipe-from-image", async (req, res) => {
     res.json({ recipes: Array.isArray(parsed) ? parsed : [parsed] });
   } catch (e) {
     res.status(500).json({ error: "이미지 분석 실패: " + e.message });
+  }
+});
+
+// ── 로컬 동영상 업로드 레시피 분석 (토큰 소모, 유튜브 추출과 동일한 길이별 차등) ──
+app.post("/api/recipe-from-video", async (req, res) => {
+  const { videoBase64, mimeType, user_id } = req.body;
+  if (!videoBase64) return res.status(400).json({ error: "영상이 없어요." });
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+
+  const buffer = Buffer.from(videoBase64, "base64");
+
+  // 영상 길이 파악 (mp4/mov 컨테이너의 moov 박스만 읽음, ffmpeg 불필요)
+  let durationSeconds = 0;
+  try {
+    durationSeconds = Math.round(getMp4DurationSeconds(buffer));
+    if (!durationSeconds) throw new Error("길이 파악 실패");
+  } catch (e) {
+    durationSeconds = 180; // 길이 파악 실패 시 최소 구간(1토큰) 기준으로 처리
+  }
+  const requiredTokens = calculateTokenCost(durationSeconds);
+
+  let userTokens;
+  try {
+    userTokens = await getOrCreateUserTokens(user_id);
+  } catch (e) {
+    return res.status(500).json({ error: "토큰 정보를 불러오지 못했어요: " + e.message });
+  }
+  if (userTokens.token_count < requiredTokens) {
+    return res.status(402).json({ error: "토큰이 부족해요.", required_tokens: requiredTokens, current_tokens: userTokens.token_count });
+  }
+
+  try {
+    const res2 = await fetch(GEMINI_URL, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: RECIPE_PROMPT },
+          { inlineData: { mimeType: mimeType || "video/mp4", data: videoBase64 } }
+        ]}],
+        generationConfig: { temperature: 1 }
+      })
+    });
+    if (!res2.ok) {
+      const err = await res2.json();
+      throw new Error(JSON.stringify(err?.error?.message || err));
+    }
+    const data = await res2.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const clean = text.replace(/```json|```/g, "").trim();
+    if (!clean) throw new Error("Gemini 응답이 비어있어요.");
+    const parsed = JSON.parse(clean);
+    const recipes = normalizeServings(Array.isArray(parsed) ? parsed : [parsed]);
+
+    let remainingTokens;
+    try {
+      remainingTokens = await deductTokens(user_id, requiredTokens);
+    } catch (e) {
+      remainingTokens = userTokens.token_count;
+    }
+
+    res.json({ recipes, method: "gemini_video_upload", tokens_used: requiredTokens, remaining_tokens: remainingTokens });
+  } catch (e) {
+    res.status(500).json({ error: "영상 분석에 실패했어요: " + e.message });
   }
 });
 
