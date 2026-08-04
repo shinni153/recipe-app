@@ -69,7 +69,17 @@ parchment_paper, pressure_cooker, earthenware_pot, steamer, grill_pan,
 mortar_pestle, wok, cleaver, bamboo_steamer, ladle, rice_cooker, sushi_mat,
 donabe, japanese_knife, mandoline_slicer
 
-required_ingredients_special과 required_ingredients_freetext는 지금은 항상 빈 배열/null로 반환할 것 (재료 마스터 리스트 준비 전).
+## 필요 특수재료 태깅 (중요)
+소금/설탕/밀가루처럼 흔한 재료 말고, 없으면 대체가 필요할 만한 특수재료만 아래 마스터 리스트에서 골라 배열로 반환할 것.
+리스트에 없는 특수재료가 필요하면 배열에 넣지 말고 required_ingredients_freetext에 원문 그대로 적을 것.
+특수재료가 하나도 없으면 required_ingredients_special은 빈 배열로.
+
+특수재료 마스터 리스트:
+mascarpone, cream_cheese, heavy_cream, sour_cream, ricotta,
+dark_chocolate, white_chocolate, cocoa_powder,
+pistachio_paste, almond_flour, hazelnut_praline,
+rum, brandy, coffee_liqueur,
+gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
 
 ## 출력 형식
 반드시 JSON 배열만 반환. 다른 텍스트 없이 JSON만.
@@ -472,30 +482,45 @@ app.put("/api/tools", async (req, res) => {
   }
 });
 
-// ── 레시피 필요 도구 vs 보유 도구 대조 ─────────────────────────
+// ── 레시피 필요 도구/재료 vs 보유 도구/재료 대조 ─────────────
+// 재료는 사용자가 등록 안 했으면 무조건 통과(배열에서 제외) — 선택 사항이라 절대 진행을 막지 않음
 app.get("/api/recipes/:id/tool-check", async (req, res) => {
   const { id } = req.params;
   const { user_id } = req.query;
   if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
     const { data: recipe, error: recipeErr } = await supabase.from("recipes")
-      .select("required_tools, required_tools_freetext").eq("id", id).single();
+      .select("required_tools, required_tools_freetext, required_ingredients_special, required_ingredients_freetext")
+      .eq("id", id).single();
     if (recipeErr) throw recipeErr;
 
-    const { data: owned, error: toolsErr } = await supabase.from("user_tools")
+    const { data: ownedTools, error: toolsErr } = await supabase.from("user_tools")
       .select("tool_key, has_it, power_tier").eq("user_id", user_id);
     if (toolsErr) throw toolsErr;
 
-    const ownedMap = Object.fromEntries((owned || []).map(o => [o.tool_key, o]));
-    const result = (recipe.required_tools || []).map(key => ({
+    const { data: ownedPantry, error: pantryErr } = await supabase.from("user_pantry")
+      .select("ingredient_key, has_it").eq("user_id", user_id);
+    if (pantryErr) throw pantryErr;
+
+    const ownedToolsMap = Object.fromEntries((ownedTools || []).map(o => [o.tool_key, o]));
+    const tools = (recipe.required_tools || []).map(key => ({
       tool_key: key,
-      has_it: ownedMap[key]?.has_it ?? false,
-      power_tier: ownedMap[key]?.power_tier ?? null
+      has_it: ownedToolsMap[key]?.has_it ?? false,
+      power_tier: ownedToolsMap[key]?.power_tier ?? null
     }));
 
-    res.json({ tools: result, freetext: recipe.required_tools_freetext });
+    const ownedPantryMap = Object.fromEntries((ownedPantry || []).map(o => [o.ingredient_key, o]));
+    // 등록 안 한 재료는 결과 배열에서 아예 제외 (모름 = 통과, 절대 ❌로 안 뜸)
+    const ingredients = (recipe.required_ingredients_special || [])
+      .filter(key => ownedPantryMap[key] !== undefined)
+      .map(key => ({ ingredient_key: key, has_it: ownedPantryMap[key].has_it }));
+
+    res.json({
+      tools, tools_freetext: recipe.required_tools_freetext,
+      ingredients, ingredients_freetext: recipe.required_ingredients_freetext
+    });
   } catch (e) {
-    res.status(500).json({ error: "도구 대조 실패: " + e.message });
+    res.status(500).json({ error: "도구/재료 대조 실패: " + e.message });
   }
 });
 
@@ -552,6 +577,38 @@ app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
     res.json({ alternative, remaining_tokens: remainingTokens });
   } catch (e) {
     res.status(500).json({ error: "대체법 조회 실패: " + e.message });
+  }
+});
+
+// ── 보유 재료 전체 조회 ───────────────────────────────────────
+app.get("/api/pantry", async (req, res) => {
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
+  try {
+    const { data, error } = await supabase.from("user_pantry").select("*").eq("user_id", user_id);
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "재료 조회 실패: " + e.message });
+  }
+});
+
+// ── 보유 재료 전체 upsert ──────────────────────────────────
+app.put("/api/pantry", async (req, res) => {
+  const { user_id, ingredients } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  if (!Array.isArray(ingredients)) return res.status(400).json({ error: "ingredients 배열이 필요해요." });
+  try {
+    const rows = ingredients.map(i => ({
+      user_id, ingredient_key: i.ingredient_key, has_it: i.has_it,
+      note: i.note || null, updated_at: new Date().toISOString()
+    }));
+    const { data, error } = await supabase.from("user_pantry")
+      .upsert(rows, { onConflict: "user_id,ingredient_key" }).select();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "재료 저장 실패: " + e.message });
   }
 });
 
