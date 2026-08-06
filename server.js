@@ -81,6 +81,13 @@ pistachio_paste, almond_flour, hazelnut_praline,
 rum, brandy, coffee_liqueur,
 gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
 
+## 조리 단계 구조화 (쿠킹모드용, 중요)
+각 조리 단계는 다음 규칙에 따라 구조화해서 반환할 것:
+- duration_seconds: 해당 단계에 명확한 소요 시간이 있으면 초 단위 숫자로 (예: "10분간 끓인다" → 600). 시간이 명시되지 않았거나 애매하면 null.
+- temperature_celsius: 오븐/에어프라이어 등 명확한 온도 지시가 있으면 섭씨 숫자로 (예: "180도로 예열" → 180). 없으면 null.
+- video_timestamp: 실제 영상을 직접 보고 분석하는 경우에만, 그 단계가 시작되는 영상 재생 시점을 "mm:ss" 형식으로. 자막(텍스트)만 받아서 분석하는 경우이거나 시점을 확신할 수 없으면 반드시 null로 반환 (추측 금지).
+- ingredients_used: 그 단계에서 실제로 사용하는 재료명 배열 (재료 목록의 name과 최대한 일치시킬 것). 없으면 빈 배열.
+
 ## 출력 형식
 반드시 JSON 배열만 반환. 다른 텍스트 없이 JSON만.
 
@@ -91,7 +98,15 @@ gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
     "servings": "동영상, 설명란, 댓글 중에서 명확히 확인 가능한 인분 수만 숫자로 표시. 불명확하거나 언급 없으면 반드시 '1회분'으로만 표시. 절대 추측 금지.",
     "time": "총 조리시간",
     "ingredients": [{"name": "재료명", "amount": "분량"}],
-    "steps": ["1단계 (중간 준비 과정 포함, 상세하게)", "2단계", ...],
+    "steps": [
+      {
+        "description": "1단계 설명 (중간 준비 과정 포함, 상세하게)",
+        "duration_seconds": 300,
+        "temperature_celsius": null,
+        "video_timestamp": "02:15",
+        "ingredients_used": ["이 단계에서 쓰는 재료명"]
+      }
+    ],
     "nutrition": {"calories": "kcal", "carbs": "g", "protein": "g", "fat": "g"},
     "required_tools": ["stand_mixer", "oven"],
     "required_tools_freetext": null,
@@ -439,7 +454,7 @@ app.post("/api/tokens/watch-ad", async (req, res) => {
 });
 
 app.post("/api/save-recipe", async (req, res) => {
-  const { recipe, category, source_url, thumbnail_url, user_id } = req.body;
+  const { recipe, category, source_url, thumbnail_url, user_id, source_type } = req.body;
   if (!recipe) return res.status(400).json({ error: "레시피가 없어요." });
   if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
@@ -448,12 +463,86 @@ app.post("/api/save-recipe", async (req, res) => {
       servings: recipe.servings, time: recipe.time, ingredients: recipe.ingredients, steps: recipe.steps,
       nutrition: recipe.nutrition, source_url: source_url || "", thumbnail_url: thumbnail_url || "",
       required_tools: recipe.required_tools || [], required_tools_freetext: recipe.required_tools_freetext || null,
-      required_ingredients_special: recipe.required_ingredients_special || [], required_ingredients_freetext: recipe.required_ingredients_freetext || null
+      required_ingredients_special: recipe.required_ingredients_special || [], required_ingredients_freetext: recipe.required_ingredients_freetext || null,
+      source_type: source_type === "manual" ? "manual" : "extracted"
     }]).select();
     if (error) throw error;
     res.json({ success: true, data });
   } catch (e) {
     res.status(500).json({ error: "저장 실패: " + e.message });
+  }
+});
+
+// ── 레시피 불러오기: 텍스트/사진으로 이미 적힌 레시피를 "그대로" 구조화 ──
+// (완성 사진에서 추론하는 /api/recipe-from-image와 다름 — 여기는 이미 적힌 내용을 옮겨적기만 함)
+const IMPORT_PROMPT = `아래는 사용자가 이미 갖고 있던 레시피(메모, 노트, 인쇄물 등)의 원문입니다.
+이 레시피를 절대로 추론하거나 각색하지 말고, 적힌 내용을 그대로 구조화해서 옮겨 적어주세요.
+원문에 없는 내용을 지어내지 마세요 — 불명확하거나 안 적힌 항목은 빈 값/null로 두세요.
+
+## 필요 도구 태깅
+이 레시피에 필요한 도구를 아래 마스터 리스트에서만 골라 배열로 반환할 것 (원문에 도구 언급이 있을 때만).
+도구 마스터 리스트:
+oven, air_fryer, microwave, induction, thermometer, stand_mixer, hand_mixer,
+dough_kneader, whisk, blender, food_processor, kitchen_scale, measuring_cup,
+fridge_freezer, piping_bag, silicone_mold, rolling_pin, sieve, spatula,
+parchment_paper, pressure_cooker, earthenware_pot, steamer, grill_pan,
+mortar_pestle, wok, cleaver, bamboo_steamer, ladle, rice_cooker, sushi_mat,
+donabe, japanese_knife, mandoline_slicer
+리스트에 없으면 required_tools_freetext에, 없으면 required_tools는 빈 배열.
+
+## 필요 특수재료 태깅
+특수재료 마스터 리스트:
+mascarpone, cream_cheese, heavy_cream, sour_cream, ricotta,
+dark_chocolate, white_chocolate, cocoa_powder,
+pistachio_paste, almond_flour, hazelnut_praline,
+rum, brandy, coffee_liqueur,
+gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
+리스트에 없으면 required_ingredients_freetext에, 없으면 required_ingredients_special은 빈 배열.
+
+## 조리 단계
+각 단계는 { "description", "duration_seconds", "temperature_celsius", "ingredients_used" } 구조로.
+원문에 시간/온도가 명시된 경우에만 숫자로, 안 적혀있으면 null. video_timestamp는 항상 null (원본 영상이 없으므로).
+
+## 출력 형식
+반드시 JSON 배열만 반환. 다른 텍스트 없이 JSON만:
+[
+  {
+    "title": "요리명",
+    "description": "한줄 설명 (원문에 있으면 그대로, 없으면 빈 문자열)",
+    "servings": "원문에 명시된 경우만 숫자, 없으면 '1회분'",
+    "time": "원문에 명시된 경우만, 없으면 빈 문자열",
+    "ingredients": [{"name": "재료명", "amount": "분량"}],
+    "steps": [{"description": "...", "duration_seconds": null, "temperature_celsius": null, "video_timestamp": null, "ingredients_used": []}],
+    "nutrition": {"calories": null, "carbs": null, "protein": null, "fat": null},
+    "required_tools": [], "required_tools_freetext": null,
+    "required_ingredients_special": [], "required_ingredients_freetext": null
+  }
+]`;
+
+app.post("/api/recipes/parse-import", async (req, res) => {
+  const { text, imageBase64, mimeType } = req.body;
+  if (!text && !imageBase64) return res.status(400).json({ error: "텍스트 또는 이미지가 필요해요." });
+  try {
+    const parts = [{ text: IMPORT_PROMPT + (text ? `\n\n원본 텍스트:\n${text}` : "\n\n원본은 첨부된 이미지를 참고하세요.") }];
+    if (imageBase64) parts.push({ inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } });
+
+    const res2 = await fetch(GEMINI_URL, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.2 } })
+    });
+    if (!res2.ok) {
+      const err = await res2.json();
+      throw new Error(JSON.stringify(err?.error?.message || err));
+    }
+    const data = await res2.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const clean = responseText.replace(/```json|```/g, "").trim();
+    if (!clean) throw new Error("Gemini 응답이 비어있어요.");
+    const parsed = JSON.parse(clean);
+    const recipes = normalizeServings(Array.isArray(parsed) ? parsed : [parsed]);
+    res.json({ recipes });
+  } catch (e) {
+    res.status(500).json({ error: "레시피 불러오기 실패: " + e.message });
   }
 });
 
