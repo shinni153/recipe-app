@@ -258,7 +258,7 @@ async function getOrCreateUserTokens(user_id) {
   let { data, error } = await supabase.from("user_tokens").select("*").eq("user_id", user_id).single();
   if (!data) {
     const { data: created, error: createError } = await supabase
-      .from("user_tokens").insert([{ user_id, token_count: 2, last_checkin_date: todayKST(), streak_count: 1 }])
+      .from("user_tokens").insert([{ user_id, token_count: 10, last_checkin_date: todayKST(), streak_count: 1 }])
       .select().single();
     if (createError) throw createError;
     return created;
