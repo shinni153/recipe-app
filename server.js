@@ -520,11 +520,24 @@ gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
 ]`;
 
 app.post("/api/recipes/parse-import", async (req, res) => {
-  const { text, imageBase64, mimeType } = req.body;
-  if (!text && !imageBase64) return res.status(400).json({ error: "텍스트 또는 이미지가 필요해요." });
+  const { text, imageBase64, mimeType, images } = req.body;
+
+  const imageList = Array.isArray(images) && images.length > 0
+    ? images
+    : (imageBase64 ? [{ imageBase64, mimeType }] : []);
+
+  if (!text && imageList.length === 0) return res.status(400).json({ error: "텍스트 또는 이미지가 필요해요." });
   try {
-    const parts = [{ text: IMPORT_PROMPT + (text ? `\n\n원본 텍스트:\n${text}` : "\n\n원본은 첨부된 이미지를 참고하세요.") }];
-    if (imageBase64) parts.push({ inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } });
+    const multiNote = imageList.length > 1
+      ? `\n\n참고: 아래 ${imageList.length}장의 사진은 같은 레시피 노트/메모의 여러 페이지일 수 있습니다. 순서대로 이어지는 내용으로 보고 전부 종합해서 하나의 레시피로 옮겨 적어줘.`
+      : "";
+
+    const parts = [{
+      text: IMPORT_PROMPT + (text ? `\n\n원본 텍스트:\n${text}` : "\n\n원본은 첨부된 이미지를 참고하세요.") + multiNote
+    }];
+    imageList.forEach(img => {
+      parts.push({ inlineData: { mimeType: img.mimeType || "image/jpeg", data: img.imageBase64 } });
+    });
 
     const res2 = await fetch(GEMINI_URL, {
       method: "POST", headers: { "Content-Type": "application/json" },
