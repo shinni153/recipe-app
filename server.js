@@ -802,16 +802,34 @@ app.delete("/api/recipes/:id", async (req, res) => {
   }
 });
 
+// ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
+// 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
+// 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
 app.post("/api/recipe-from-image", async (req, res) => {
-  const { imageBase64, mimeType } = req.body;
-  if (!imageBase64) return res.status(400).json({ error: "이미지가 없어요." });
+  const { imageBase64, mimeType, images } = req.body;
+
+  const imageList = Array.isArray(images) && images.length > 0
+    ? images
+    : (imageBase64 ? [{ imageBase64, mimeType }] : []);
+
+  if (imageList.length === 0) return res.status(400).json({ error: "이미지가 없어요." });
+
   try {
+    const multiNote = imageList.length > 1
+      ? `\n\n참고: 아래 ${imageList.length}장의 사진은 같은 음식(또는 조리 과정)을 여러 각도나 단계에서 찍은 것일 수 있습니다. 모든 사진을 함께 참고해서 하나의 레시피로 종합 추론해줘.`
+      : "";
+
     const imagePrompt = `이 음식 사진을 보고 레시피를 추론해줘. 반드시 JSON 배열 형식으로만 반환해줘. 다른 텍스트 없이 JSON만:
-[{"title":"요리명","description":"한줄설명","servings":"인분","time":"조리시간","ingredients":[{"name":"재료명","amount":"분량"}],"steps":["1단계","2단계"],"nutrition":{"calories":"kcal","carbs":"g","protein":"g","fat":"g"}}]`;
+[{"title":"요리명","description":"한줄설명","servings":"인분","time":"조리시간","ingredients":[{"name":"재료명","amount":"분량"}],"steps":["1단계","2단계"],"nutrition":{"calories":"kcal","carbs":"g","protein":"g","fat":"g"}}]${multiNote}`;
+
+    const imageParts = imageList.map(img => ({
+      inlineData: { mimeType: img.mimeType || "image/jpeg", data: img.imageBase64 }
+    }));
+
     const res2 = await fetch(GEMINI_URL, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: imagePrompt }, { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } }] }],
+        contents: [{ parts: [{ text: imagePrompt }, ...imageParts] }],
         generationConfig: { temperature: 1 }
       })
     });
