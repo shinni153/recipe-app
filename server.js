@@ -876,6 +876,10 @@ app.post("/api/auth/kakao", async (req, res) => {
 });
 
 
+// ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
+// 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
+// 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
+app.post("/api/recipe-from-image", async (req, res) => {
   const { imageBase64, mimeType, images } = req.body;
 
   const imageList = Array.isArray(images) && images.length > 0
