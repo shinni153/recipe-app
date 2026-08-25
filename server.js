@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const crypto = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
@@ -818,7 +819,63 @@ app.delete("/api/recipes/:id", async (req, res) => {
 // ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
 // 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
 // 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
-app.post("/api/recipe-from-image", async (req, res) => {
+// ── 카카오 로그인: 토큰 검증 + Supabase 계정 연결 ──────────────────
+// Supabase가 카카오를 기본 지원 안 해서, 카카오ID 기반으로 고정된(결정적) 비밀번호를
+// 서버만 아는 비밀키로 생성해 Supabase 이메일/비밀번호 로그인처럼 처리합니다.
+// ⚠️ 참고: listUsers()는 사용자 수가 아주 많아지면(수천 명 이상) 비효율적일 수 있어서,
+//    나중에 유저 많아지면 kakao_id -> supabase user id 매핑 테이블로 바꾸는 게 좋습니다.
+function deriveKakaoPassword(kakaoUserId) {
+  return crypto
+    .createHmac("sha256", SUPABASE_SECRET_KEY + ":kakao-auth")
+    .update(String(kakaoUserId))
+    .digest("hex");
+}
+
+app.post("/api/auth/kakao", async (req, res) => {
+  const { accessToken } = req.body;
+  if (!accessToken) return res.status(400).json({ error: "카카오 토큰이 없어요." });
+
+  try {
+    // 1) 카카오 서버에 토큰 검증 + 사용자 정보 요청
+    const kakaoRes = await fetch("https://kapi.kakao.com/v2/user/me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!kakaoRes.ok) return res.status(401).json({ error: "유효하지 않은 카카오 토큰이에요." });
+    const kakaoUser = await kakaoRes.json();
+    const kakaoId = kakaoUser.id;
+    const kakaoEmail = kakaoUser.kakao_account?.email;
+    const nickname = kakaoUser.kakao_account?.profile?.nickname || null;
+
+    // 이메일 동의항목이 아직 승인 안 됐거나 사용자가 비공개 처리한 경우, 카카오ID 기반 내부 이메일 사용
+    const email = kakaoEmail || `kakao_${kakaoId}@recipex.internal`;
+    const password = deriveKakaoPassword(kakaoId);
+
+    // 2) 이 이메일로 이미 가입된 Supabase 유저가 있는지 확인
+    const { data: userList, error: listErr } = await supabase.auth.admin.listUsers();
+    if (listErr) throw listErr;
+    const found = userList?.users?.find(u => u.email === email);
+
+    if (found) {
+      // 기존 유저: 매번 같은 값으로 재설정 (idempotent, 실제로는 값이 안 바뀜)
+      await supabase.auth.admin.updateUserById(found.id, { password });
+    } else {
+      // 신규 유저 생성
+      const { error: createErr } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { provider: "kakao", kakao_id: kakaoId, nickname },
+      });
+      if (createErr) throw createErr;
+    }
+
+    res.json({ email, hashedPassword: password });
+  } catch (e) {
+    res.status(500).json({ error: "카카오 로그인 처리 실패: " + e.message });
+  }
+});
+
+
   const { imageBase64, mimeType, images } = req.body;
 
   const imageList = Array.isArray(images) && images.length > 0
