@@ -819,16 +819,37 @@ app.delete("/api/recipes/:id", async (req, res) => {
 // ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
 // 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
 // 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
+
+
 // ── 카카오 로그인: 토큰 검증 + Supabase 계정 연결 ──────────────────
 // Supabase가 카카오를 기본 지원 안 해서, 카카오ID 기반으로 고정된(결정적) 비밀번호를
 // 서버만 아는 비밀키로 생성해 Supabase 이메일/비밀번호 로그인처럼 처리합니다.
-// ⚠️ 참고: listUsers()는 사용자 수가 아주 많아지면(수천 명 이상) 비효율적일 수 있어서,
-//    나중에 유저 많아지면 kakao_id -> supabase user id 매핑 테이블로 바꾸는 게 좋습니다.
+// kakao_user_map 테이블(kakao_id -> supabase_user_id)로 매핑해서,
+// 로그인마다 전체 유저를 훑는 listUsers()를 다시 부르지 않도록 했습니다.
+// listUsers()는 매핑이 아직 없는 유저(최초 로그인 또는 이 테이블 도입 전 가입자)에 한해서만,
+// 그것도 딱 한 번만 호출됩니다.
 function deriveKakaoPassword(kakaoUserId) {
   return crypto
     .createHmac("sha256", SUPABASE_SECRET_KEY + ":kakao-auth")
     .update(String(kakaoUserId))
     .digest("hex");
+}
+
+async function findKakaoMapping(kakaoId) {
+  const { data, error } = await supabase
+    .from("kakao_user_map")
+    .select("supabase_user_id")
+    .eq("kakao_id", String(kakaoId))
+    .maybeSingle();
+  if (error) throw error;
+  return data?.supabase_user_id || null;
+}
+
+async function saveKakaoMapping(kakaoId, supabaseUserId) {
+  const { error } = await supabase
+    .from("kakao_user_map")
+    .insert([{ kakao_id: String(kakaoId), supabase_user_id: supabaseUserId }]);
+  if (error) throw error;
 }
 
 app.post("/api/auth/kakao", async (req, res) => {
@@ -846,27 +867,43 @@ app.post("/api/auth/kakao", async (req, res) => {
     const kakaoEmail = kakaoUser.kakao_account?.email;
     const nickname = kakaoUser.kakao_account?.profile?.nickname || null;
 
-    // 이메일 동의항목이 아직 승인 안 됐거나 사용자가 비공개 처리한 경우, 카카오ID 기반 내부 이메일 사용
-    const email = kakaoEmail || `kakao_${kakaoId}@recipex.internal`;
     const password = deriveKakaoPassword(kakaoId);
 
-    // 2) 이 이메일로 이미 가입된 Supabase 유저가 있는지 확인
-    const { data: userList, error: listErr } = await supabase.auth.admin.listUsers();
-    if (listErr) throw listErr;
-    const found = userList?.users?.find(u => u.email === email);
+    // 2) 매핑 테이블에서 카카오ID로 바로 조회 (listUsers() 없이 즉시 확인)
+    let supabaseUserId = await findKakaoMapping(kakaoId);
+    let email;
 
-    if (found) {
-      // 기존 유저: 매번 같은 값으로 재설정 (idempotent, 실제로는 값이 안 바뀜)
-      await supabase.auth.admin.updateUserById(found.id, { password });
+    if (supabaseUserId) {
+      // 이미 매핑된 기존 유저: Supabase에 등록된 현재 이메일을 그대로 사용, 비밀번호만 재설정(idempotent)
+      const { data: userData, error: getErr } = await supabase.auth.admin.getUserById(supabaseUserId);
+      if (getErr || !userData?.user) throw getErr || new Error("매핑된 유저를 찾을 수 없어요.");
+      email = userData.user.email;
+      await supabase.auth.admin.updateUserById(supabaseUserId, { password });
     } else {
-      // 신규 유저 생성
-      const { error: createErr } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { provider: "kakao", kakao_id: kakaoId, nickname },
-      });
-      if (createErr) throw createErr;
+      // 매핑이 없는 경우: 최초 로그인이거나, 매핑 테이블 도입 전 가입한 레거시 유저일 수 있음
+      email = kakaoEmail || `kakao_${kakaoId}@recipex.internal`;
+
+      // 레거시 유저 확인 (이 경로는 매핑이 없을 때만, 유저 1인당 딱 한 번만 탐)
+      const { data: userList, error: listErr } = await supabase.auth.admin.listUsers();
+      if (listErr) throw listErr;
+      const legacy = userList?.users?.find(u => u.email === email);
+
+      if (legacy) {
+        supabaseUserId = legacy.id;
+        await supabase.auth.admin.updateUserById(supabaseUserId, { password });
+      } else {
+        const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { provider: "kakao", kakao_id: kakaoId, nickname },
+        });
+        if (createErr) throw createErr;
+        supabaseUserId = created.user.id;
+      }
+
+      // 다음부터는 listUsers() 없이 바로 찾을 수 있도록 매핑 저장
+      await saveKakaoMapping(kakaoId, supabaseUserId);
     }
 
     res.json({ email, hashedPassword: password });
