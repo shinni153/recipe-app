@@ -890,6 +890,89 @@ app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   🥗 다이어트 코치 (2026-09-03 추가)
+   레시피를 완전히 바꾸는 게 아니라, 그대로 유지하면서 "뺄 것/바꿀 것/줄일 것"을
+   구체적으로 제안. 같은 레시피는 한 번 생성한 결과를 캐시해서 재사용
+   (tool_alternatives와 동일한 캐싱 패턴) — 캐시 여부와 무관하게 토큰 1개 차감.
+   ══════════════════════════════════════════════════════════════════ */
+
+const DIET_COACH_PROMPT = `너는 다이어트 코치야. 아래 레시피를 보고, 다이어트(체중감량/건강한 식습관) 관점에서
+실질적으로 도움되는 조언을 3~5개 제안해줘.
+
+각 제안은 다음 세 가지 유형 중 하나로 분류해줘:
+- "remove": 빼도 되는 재료/과정 (맛에 큰 영향 없이 칼로리만 줄이는 것)
+- "swap": 다른 재료/조리법으로 바꾸는 것 (예: 튀기기→에어프라이어, 흰쌀밥→현미밥)
+- "reduce": 양을 줄이는 것 (예: 밥 200g→150g)
+
+규칙:
+- 각 제안은 구체적이고 실행 가능해야 함 (막연한 "건강하게 드세요" 금지)
+- 이 레시피의 정체성을 완전히 바꾸는 제안은 하지 말 것 (예: "이 요리 대신 샐러드를 드세요" 금지)
+  — 이 레시피를 최대한 유지하면서 개선하는 관점으로 제안할 것
+- 원문에 없는 재료/수치를 지어내지 말 것
+
+반드시 아래 JSON 형식 배열만 반환. 다른 텍스트 없이 JSON만:
+[
+  { "type": "remove", "title": "짧은 제목", "description": "1~2문장 설명" }
+]`;
+
+app.post("/api/recipes/:id/diet-coach", async (req, res) => {
+  const { id } = req.params;
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+
+  try {
+    const userTokens = await getOrCreateUserTokens(user_id);
+    if (userTokens.token_count < 1) {
+      return res.status(402).json({ error: "토큰이 부족해요.", required_tokens: 1, current_tokens: userTokens.token_count });
+    }
+
+    const { data: recipe, error: recipeErr } = await supabase.from("recipes")
+      .select("title, ingredients, steps, nutrition").eq("id", id).single();
+    if (recipeErr || !recipe) return res.status(404).json({ error: "레시피를 찾을 수 없어요." });
+
+    const { data: cached } = await supabase.from("diet_coach_cache")
+      .select("suggestions").eq("recipe_id", id).single();
+
+    let suggestions;
+    if (cached) {
+      suggestions = cached.suggestions;
+    } else {
+      const prompt = `${DIET_COACH_PROMPT}
+
+레시피명: ${recipe.title}
+재료: ${JSON.stringify(recipe.ingredients || [])}
+조리 과정: ${JSON.stringify(recipe.steps || [])}
+영양정보(추정): ${JSON.stringify(recipe.nutrition || {})}`;
+
+      const res2 = await fetch(GEMINI_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4 }
+        })
+      });
+      if (!res2.ok) {
+        const err = await res2.json();
+        throw new Error(JSON.stringify(err?.error?.message || err));
+      }
+      const data = await res2.json();
+      const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      const clean = text.replace(/```json|```/g, "").trim();
+      if (!clean) throw new Error("Gemini 응답이 비어있어요.");
+      suggestions = JSON.parse(clean);
+
+      await supabase.from("diet_coach_cache")
+        .insert([{ recipe_id: id, suggestions }]);
+    }
+
+    const remainingTokens = await deductTokens(user_id, 1);
+    res.json({ suggestions, remaining_tokens: remainingTokens });
+  } catch (e) {
+    res.status(500).json({ error: "다이어트 코치 분석 실패: " + e.message });
+  }
+});
+
 // ── 보유 재료 전체 조회 ───────────────────────────────────────
 app.get("/api/pantry", async (req, res) => {
   const { user_id } = req.query;
