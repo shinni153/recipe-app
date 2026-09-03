@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const cheerio = require("cheerio");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
@@ -557,6 +558,145 @@ app.post("/api/recipes/parse-import", async (req, res) => {
     res.json({ recipes });
   } catch (e) {
     res.status(500).json({ error: "레시피 불러오기 실패: " + e.message });
+  }
+});
+
+// ── 블로그/웹페이지 URL로 레시피 불러오기 (2026-09-01 추가) ──────────
+// (레시피 불러오기 = IMPORT_PROMPT와 같은 성격: 이미 적힌 레시피를 "그대로" 옮겨적음, 추론 안 함)
+// 다만 블로그 글은 조리 후기/일상 이야기가 레시피 앞뒤로 길게 붙는 경우가 많아서
+// 그 부분은 무시하고 실제 레시피(재료/조리법)만 골라내도록 지시문을 별도로 둠.
+const WEBPAGE_IMPORT_PROMPT = `아래는 블로그/웹페이지에서 가져온 글 원문입니다 (레시피 외에 일상 이야기, 광고, 댓글 등 관련없는 텍스트가 섞여있을 수 있습니다).
+
+이 글에서 실제 레시피(재료, 조리 순서) 부분만 찾아서 옮겨 적어주세요.
+- 레시피와 무관한 일상 이야기, 인사말, 광고, 해시태그, 댓글은 완전히 무시할 것
+- 절대로 추론하거나 각색하지 말고, 원문에 적힌 내용을 그대로 구조화해서 옮겨 적을 것
+- 원문에 없는 내용을 지어내지 말 것 — 불명확하거나 안 적힌 항목은 빈 값/null로 둘 것
+- 이 글에 레시피가 아예 없다고 판단되면, 빈 배열 []을 반환할 것
+
+## 필요 도구 태깅
+이 레시피에 필요한 도구를 아래 마스터 리스트에서만 골라 배열로 반환할 것 (원문에 도구 언급이 있을 때만).
+도구 마스터 리스트:
+oven, air_fryer, microwave, induction, thermometer, stand_mixer, hand_mixer,
+dough_kneader, whisk, blender, food_processor, kitchen_scale, measuring_cup,
+fridge_freezer, piping_bag, silicone_mold, rolling_pin, sieve, spatula,
+parchment_paper, pressure_cooker, earthenware_pot, steamer, grill_pan,
+mortar_pestle, wok, cleaver, bamboo_steamer, ladle, rice_cooker, sushi_mat,
+donabe, japanese_knife, mandoline_slicer
+리스트에 없으면 required_tools_freetext에, 없으면 required_tools는 빈 배열.
+
+## 필요 특수재료 태깅
+특수재료 마스터 리스트:
+mascarpone, cream_cheese, heavy_cream, sour_cream, ricotta,
+dark_chocolate, white_chocolate, cocoa_powder,
+pistachio_paste, almond_flour, hazelnut_praline,
+rum, brandy, coffee_liqueur,
+gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
+리스트에 없으면 required_ingredients_freetext에, 없으면 required_ingredients_special은 빈 배열.
+
+## 조리 단계
+각 단계는 { "description", "duration_seconds", "temperature_celsius", "ingredients_used" } 구조로.
+원문에 시간/온도가 명시된 경우에만 숫자로, 안 적혀있으면 null. video_timestamp는 항상 null.
+
+## 출력 형식
+반드시 JSON 배열만 반환. 다른 텍스트 없이 JSON만:
+[
+  {
+    "title": "요리명",
+    "description": "한줄 설명 (원문에 있으면 그대로, 없으면 빈 문자열)",
+    "servings": "원문에 명시된 경우만 숫자, 없으면 '1회분'",
+    "time": "원문에 명시된 경우만, 없으면 빈 문자열",
+    "ingredients": [{"name": "재료명", "amount": "분량"}],
+    "steps": [{"description": "...", "duration_seconds": null, "temperature_celsius": null, "video_timestamp": null, "ingredients_used": []}],
+    "nutrition": {"calories": null, "carbs": null, "protein": null, "fat": null},
+    "required_tools": [], "required_tools_freetext": null,
+    "required_ingredients_special": [], "required_ingredients_freetext": null
+  }
+]`;
+
+function isNaverBlogUrl(url) {
+  return /blog\.naver\.com/.test(url);
+}
+
+// 네이버 블로그 PC 버전은 본문이 iframe 안에서 자바스크립트로 로딩되기 때문에
+// 서버에서 그냥 긁으면 빈 껍데기만 나옴 -> 모바일 버전(m.blog.naver.com)은
+// 서버가 본문을 직접 렌더링해서 내려주므로 그쪽으로 우회함
+function toNaverMobileUrl(url) {
+  return url.replace(/^https?:\/\/(?:m\.)?blog\.naver\.com/, "https://m.blog.naver.com");
+}
+
+async function fetchWebpageText(url) {
+  const targetUrl = isNaverBlogUrl(url) ? toNaverMobileUrl(url) : url;
+
+  const pageRes = await fetch(targetUrl, {
+    headers: {
+      // 일부 블로그/사이트가 봇(비브라우저) 요청을 차단하므로 일반 브라우저처럼 위장
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    },
+  });
+  if (!pageRes.ok) throw new Error(`페이지를 불러오지 못했어요 (상태코드 ${pageRes.status})`);
+  const html = await pageRes.text();
+
+  const $ = cheerio.load(html);
+  $("script, style, nav, header, footer, aside, iframe, noscript, form").remove();
+
+  // 사이트별로 본문이 들어있을 확률이 높은 영역을 순서대로 시도하고,
+  // 어디에도 안 맞으면 페이지 전체 텍스트로 폴백
+  const candidateSelectors = [
+    ".se-main-container",            // 네이버 블로그 스마트에디터(SE3)
+    "#postViewArea",                 // 네이버 블로그 구버전 에디터
+    ".tt_article_useless_p_margin",  // 티스토리
+    ".entry-content",                // 워드프레스류
+    "article",
+  ];
+  let contentText = "";
+  for (const sel of candidateSelectors) {
+    const el = $(sel).first();
+    if (el.length && el.text().trim().length > 100) {
+      contentText = el.text();
+      break;
+    }
+  }
+  if (!contentText) contentText = $("body").text();
+
+  return contentText.replace(/\s+/g, " ").trim();
+}
+
+app.post("/api/recipes/parse-import-url", async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL이 없어요." });
+
+  let pageText;
+  try {
+    pageText = await fetchWebpageText(url);
+  } catch (e) {
+    return res.status(500).json({ error: "이 페이지에서 내용을 가져오지 못했어요: " + e.message });
+  }
+  if (!pageText || pageText.length < 50) {
+    return res.status(422).json({ error: "이 페이지에서 레시피 내용을 찾지 못했어요. 비공개 글이거나 페이지 구조가 달라서 인식이 안 될 수 있어요." });
+  }
+
+  try {
+    const prompt = `${WEBPAGE_IMPORT_PROMPT}\n\n원본 페이지 텍스트:\n${pageText.slice(0, 12000)}`;
+    const res2 = await fetch(GEMINI_URL, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } })
+    });
+    if (!res2.ok) {
+      const err = await res2.json();
+      throw new Error(JSON.stringify(err?.error?.message || err));
+    }
+    const data = await res2.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const clean = responseText.replace(/```json|```/g, "").trim();
+    if (!clean) throw new Error("Gemini 응답이 비어있어요.");
+    const parsed = JSON.parse(clean);
+    const recipes = normalizeServings(Array.isArray(parsed) ? parsed : [parsed]);
+    if (recipes.length === 0) {
+      return res.status(422).json({ error: "이 페이지에서 레시피를 찾지 못했어요." });
+    }
+    res.json({ recipes });
+  } catch (e) {
+    res.status(500).json({ error: "레시피 분석 실패: " + e.message });
   }
 });
 
