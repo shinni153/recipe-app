@@ -974,6 +974,62 @@ app.post("/api/recipes/:id/diet-coach", async (req, res) => {
 });
 
 // ── 보유 재료 전체 조회 ───────────────────────────────────────
+/* ══════════════════════════════════════════════════════════════════
+   🔒 유료 기능 이용권 (2026-09-05 추가)
+   진짜 정기결제(Google Play 구독) 붙이기 전, 먼저 토큰으로 검증하는 단계.
+   기능별 비용/기간을 여기 한 곳에서 관리 — 나중에 다른 유료 기능 생기면
+   FEATURE_COSTS에 한 줄만 추가하면 됨.
+   ══════════════════════════════════════════════════════════════════ */
+
+const FEATURE_COSTS = {
+  menu_dev: { tokens: 50, days: 30 }, // 메뉴개발노트
+};
+
+app.get("/api/features/:key/status", async (req, res) => {
+  const { key } = req.params;
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  try {
+    const { data } = await supabase.from("user_feature_unlocks")
+      .select("expires_at").eq("user_id", user_id).eq("feature_key", key).maybeSingle();
+    const unlocked = !!data && new Date(data.expires_at) > new Date();
+    res.json({ unlocked, expires_at: data?.expires_at || null, cost: FEATURE_COSTS[key] || null });
+  } catch (e) {
+    res.status(500).json({ error: "이용권 상태 조회 실패: " + e.message });
+  }
+});
+
+app.post("/api/features/:key/unlock", async (req, res) => {
+  const { key } = req.params;
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+  const featureCost = FEATURE_COSTS[key];
+  if (!featureCost) return res.status(400).json({ error: "알 수 없는 기능이에요." });
+
+  try {
+    const userTokens = await getOrCreateUserTokens(user_id);
+    if (userTokens.token_count < featureCost.tokens) {
+      return res.status(402).json({ error: "토큰이 부족해요.", required_tokens: featureCost.tokens, current_tokens: userTokens.token_count });
+    }
+
+    const { data: existing } = await supabase.from("user_feature_unlocks")
+      .select("expires_at").eq("user_id", user_id).eq("feature_key", key).maybeSingle();
+
+    // 아직 유효기간이 남아있으면 그 날짜부터, 만료됐거나 처음이면 오늘부터 이어붙임 (재구매 시 손해 안 보게)
+    const baseDate = existing && new Date(existing.expires_at) > new Date() ? new Date(existing.expires_at) : new Date();
+    const newExpiresAt = new Date(baseDate.getTime() + featureCost.days * 24 * 60 * 60 * 1000);
+
+    const { error: upsertErr } = await supabase.from("user_feature_unlocks")
+      .upsert([{ user_id, feature_key: key, expires_at: newExpiresAt.toISOString() }], { onConflict: "user_id,feature_key" });
+    if (upsertErr) throw upsertErr;
+
+    const remainingTokens = await deductTokens(user_id, featureCost.tokens);
+    res.json({ unlocked: true, expires_at: newExpiresAt.toISOString(), remaining_tokens: remainingTokens });
+  } catch (e) {
+    res.status(500).json({ error: "이용권 구매 실패: " + e.message });
+  }
+});
+
 app.get("/api/pantry", async (req, res) => {
   const { user_id } = req.query;
   if (!user_id) return res.status(400).json({ error: "user_id가 없어요." });
