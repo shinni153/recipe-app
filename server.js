@@ -1413,8 +1413,19 @@ app.get("/api/menu/:id", async (req, res) => {
       : { data: [] };
     const { data: checklist } = await supabase.from("launch_checklists").select("*").eq("menu_item_id", id).single();
 
+    // 버전별 "가장 최근에 남긴 평가"를 같이 내려줌 (표에서 별점 미리보기용)
+    const versionIds = (versions || []).map(v => v.id);
+    const { data: evals } = versionIds.length
+      ? await supabase.from("evaluation_logs").select("*").in("base_version_id", versionIds).order("created_at", { ascending: false })
+      : { data: [] };
+    const latestEvalByVersion = {};
+    (evals || []).forEach(e => {
+      if (!latestEvalByVersion[e.base_version_id]) latestEvalByVersion[e.base_version_id] = e;
+    });
+
     const basesWithVersions = (bases || []).map(b => ({
       ...b, versions: (versions || []).filter(v => v.base_id === b.id)
+        .map(v => ({ ...v, evaluation: latestEvalByVersion[v.id] || null }))
     }));
     res.json({ menu, bases: basesWithVersions, checklist });
   } catch (e) {
