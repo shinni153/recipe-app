@@ -985,6 +985,14 @@ const FEATURE_COSTS = {
   menu_dev: { tokens: 50, days: 30 }, // 메뉴개발노트
 };
 
+// 이용권 보유 여부를 서버에서도 반드시 재확인 (화면 쪽 체크만 믿으면, 앱을 안 거치고
+// API를 직접 호출하는 방식으로 이용권 없이도 기능을 쓸 수 있는 우회로가 생김)
+async function hasFeatureUnlocked(user_id, key) {
+  const { data } = await supabase.from("user_feature_unlocks")
+    .select("expires_at").eq("user_id", user_id).eq("feature_key", key).maybeSingle();
+  return !!data && new Date(data.expires_at) > new Date();
+}
+
 app.get("/api/features/:key/status", async (req, res) => {
   const { key } = req.params;
   const { user_id } = req.query;
@@ -1331,6 +1339,9 @@ app.post("/api/menu/from-recipe", async (req, res) => {
   if (!recipe_id) return res.status(400).json({ error: "recipe_id가 없어요." });
   if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
+    const unlocked = await hasFeatureUnlocked(user_id, "menu_dev");
+    if (!unlocked) return res.status(403).json({ error: "메뉴개발노트는 비즈니스 이용권이 필요해요.", feature_key: "menu_dev" });
+
     const { data: recipe, error: recipeErr } = await supabase.from("recipes")
       .select("*").eq("id", recipe_id).eq("user_id", user_id).single();
     if (recipeErr || !recipe) return res.status(404).json({ error: "레시피를 찾을 수 없어요." });
@@ -1674,6 +1685,9 @@ app.post("/api/menu/save-freeform", async (req, res) => {
   if (!Array.isArray(versions) || versions.length === 0) return res.status(400).json({ error: "저장할 버전이 없어요." });
 
   try {
+    const unlocked = await hasFeatureUnlocked(user_id, "menu_dev");
+    if (!unlocked) return res.status(403).json({ error: "메뉴개발노트는 비즈니스 이용권이 필요해요.", feature_key: "menu_dev" });
+
     const { data: menu, error: menuErr } = await supabase.from("menu_items")
       .insert([{ user_id, name: menu_name, target_cost_ratio: 30 }])
       .select().single();
