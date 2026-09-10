@@ -1756,4 +1756,68 @@ app.post("/api/menu/save-freeform", async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   💳 RevenueCat 웹훅 (2026-09-10 추가)
+   토큰 구매(소모성 상품)는 RevenueCat에서 "NON_RENEWING_PURCHASE" 이벤트로 전달됨.
+   같은 결제 건이 재전송되는 경우가 있어서, transaction_id 기준으로 중복 지급을 막음.
+   ══════════════════════════════════════════════════════════════════ */
+
+// 상품ID -> 지급할 토큰 개수 매핑 (Play Console/RevenueCat에 등록한 4개 상품과 일치해야 함)
+const TOKEN_PRODUCT_MAP = {
+  tokens_20: 20,
+  tokens_50: 50,
+  tokens_120: 120,
+  tokens_300: 300,
+};
+
+app.post("/api/revenuecat-webhook", async (req, res) => {
+  // RevenueCat 웹훅 설정 화면에 넣은 Authorization header 값과 일치하는지 확인
+  // (일치 안 하면 아무나 이 주소로 가짜 요청을 보내서 토큰을 받아갈 수 있음)
+  const authHeader = req.headers["authorization"];
+  if (!process.env.REVENUECAT_WEBHOOK_SECRET || authHeader !== process.env.REVENUECAT_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: "인증 실패" });
+  }
+
+  const event = req.body?.event;
+  if (!event) return res.status(400).json({ error: "이벤트 데이터가 없어요." });
+
+  // 토큰(소모성 상품) 구매가 아닌 이벤트는 무시하고 200 응답만 (RevenueCat이 재시도하지 않도록)
+  if (event.type !== "NON_RENEWING_PURCHASE") {
+    return res.json({ received: true, skipped: event.type });
+  }
+
+  const userId = event.app_user_id;
+  const productId = event.product_id;
+  const tokensToGrant = TOKEN_PRODUCT_MAP[productId];
+
+  if (!userId || !tokensToGrant) {
+    return res.json({ received: true, skipped: "매핑되지 않은 상품이거나 user_id 없음" });
+  }
+
+  try {
+    // 이미 처리한 거래인지 확인 (재전송된 웹훅에 대한 중복 지급 방지)
+    const { data: existing } = await supabase.from("token_purchase_logs")
+      .select("id").eq("transaction_id", event.transaction_id).maybeSingle();
+    if (existing) {
+      return res.json({ received: true, already_processed: true });
+    }
+
+    const tokens = await getOrCreateUserTokens(userId);
+    const { error: updateErr } = await supabase.from("user_tokens").update({
+      token_count: tokens.token_count + tokensToGrant, updated_at: new Date().toISOString()
+    }).eq("user_id", userId);
+    if (updateErr) throw updateErr;
+
+    await supabase.from("token_purchase_logs").insert([{
+      user_id: userId, product_id: productId, tokens_granted: tokensToGrant,
+      transaction_id: event.transaction_id, environment: event.environment || null,
+    }]);
+
+    res.json({ received: true, granted: tokensToGrant });
+  } catch (e) {
+    // 500을 반환하면 RevenueCat이 자동으로 재시도하므로, 진짜 실패했을 때만 500
+    res.status(500).json({ error: "토큰 지급 실패: " + e.message });
+  }
+});
+
 app.listen(3000, () => console.log("✅ 서버 실행 중: http://localhost:3000"));
