@@ -645,6 +645,9 @@ async function fetchWebpageText(url) {
     ".se-main-container",            // 네이버 블로그 스마트에디터(SE3)
     "#postViewArea",                 // 네이버 블로그 구버전 에디터
     ".tt_article_useless_p_margin",  // 티스토리
+    ".wprm-recipe-container",        // WP Recipe Maker (해외 워드프레스 레시피 블로그 다수가 사용)
+    ".tasty-recipes",                // Tasty Recipes 플러그인
+    ".easyrecipe",                   // EasyRecipe 플러그인
     ".entry-content",                // 워드프레스류
     "article",
   ];
@@ -661,9 +664,23 @@ async function fetchWebpageText(url) {
   return contentText.replace(/\s+/g, " ").trim();
 }
 
+// ── 일반 블로그/웹페이지 레시피 불러오기 (2026-09-09 수정: 토큰 1개 차감) ──
+// 성공(레시피를 실제로 찾은 경우)했을 때만 차감 — 사이트 구조상 실패한 경우까지
+// 과금하면 유저 입장에서 억울하므로, 유튜브 추출(/api/extract)과 동일한 원칙 적용
 app.post("/api/recipes/parse-import-url", async (req, res) => {
-  const { url } = req.body;
+  const { url, user_id } = req.body;
   if (!url) return res.status(400).json({ error: "URL이 없어요." });
+  if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
+
+  let userTokens;
+  try {
+    userTokens = await getOrCreateUserTokens(user_id);
+  } catch (e) {
+    return res.status(500).json({ error: "토큰 정보를 불러오지 못했어요: " + e.message });
+  }
+  if (userTokens.token_count < 1) {
+    return res.status(402).json({ error: "토큰이 부족해요.", required_tokens: 1, current_tokens: userTokens.token_count });
+  }
 
   let pageText;
   try {
@@ -694,7 +711,15 @@ app.post("/api/recipes/parse-import-url", async (req, res) => {
     if (recipes.length === 0) {
       return res.status(422).json({ error: "이 페이지에서 레시피를 찾지 못했어요." });
     }
-    res.json({ recipes });
+
+    let remainingTokens;
+    try {
+      remainingTokens = await deductTokens(user_id, 1);
+    } catch (e) {
+      remainingTokens = userTokens.token_count;
+    }
+
+    res.json({ recipes, tokens_used: 1, remaining_tokens: remainingTokens });
   } catch (e) {
     res.status(500).json({ error: "레시피 분석 실패: " + e.message });
   }
@@ -973,7 +998,6 @@ app.post("/api/recipes/:id/diet-coach", async (req, res) => {
   }
 });
 
-// ── 보유 재료 전체 조회 ───────────────────────────────────────
 /* ══════════════════════════════════════════════════════════════════
    🔒 유료 기능 이용권 (2026-09-05 추가)
    진짜 정기결제(Google Play 구독) 붙이기 전, 먼저 토큰으로 검증하는 단계.
@@ -1103,11 +1127,6 @@ app.delete("/api/recipes/:id", async (req, res) => {
   }
 });
 
-// ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
-// 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
-// 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
-
-
 // ── 카카오 로그인: 토큰 검증 + Supabase 계정 연결 ──────────────────
 // Supabase가 카카오를 기본 지원 안 해서, 카카오ID 기반으로 고정된(결정적) 비밀번호를
 // 서버만 아는 비밀키로 생성해 Supabase 이메일/비밀번호 로그인처럼 처리합니다.
@@ -1198,7 +1217,6 @@ app.post("/api/auth/kakao", async (req, res) => {
     res.status(500).json({ error: "카카오 로그인 처리 실패: " + e.message });
   }
 });
-
 
 // ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
 // 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
