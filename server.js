@@ -420,6 +420,9 @@ app.post("/api/extract", async (req, res) => {
     recipes = await analyzeVideoWithGemini(url, description, comments, user_id);
     method = "gemini_video";
   } catch (e) {
+    // [2026-09-12 추가] 영상 직접 분석이 왜 실패해서 자막 방식으로 넘어가는지
+    // 지금까지는 로그에 전혀 안 남고 있었음 — 원인 파악을 위해 추가
+    console.error("⚠️ 영상 직접 분석 실패, 자막 방식으로 재시도:", e.message);
     try {
       const transcript = await getTranscriptSupadata(videoId);
       recipes = await analyzeTranscriptWithGemini(transcript, description, comments, user_id);
