@@ -19,6 +19,55 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
+// ── Gemini 호출 가격표 (gemini-2.5-flash, 2026-09 기준) ───────────
+// 가격이 바뀌면(또는 모델을 바꾸면) 여기만 수정하면 ai_usage_logs 기록도 같이 맞게 계산됨
+const GEMINI_PRICE = {
+  model: "gemini-2.5-flash",
+  inputPerMillion: 0.30,   // USD / 1,000,000 input tokens
+  outputPerMillion: 2.50,  // USD / 1,000,000 output tokens
+};
+
+// ── Gemini 호출 + 사용량(토큰/비용) 자동 기록 공통 함수 ─────────────
+// 기존에 9군데 흩어져있던 "fetch(GEMINI_URL, ...)" 호출을 전부 이 함수로 통일함.
+// feature: 어떤 기능에서 호출했는지 구분용 문자열 (예: "extract_video_youtube")
+// userId/recipeId: 있으면 같이 기록 (없어도 됨)
+// 사용량 기록 자체가 실패해도 본 기능(레시피 추출 등)에는 절대 영향 주지 않음.
+async function callGeminiAndLog(payload, { feature, userId = null, recipeId = null } = {}) {
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
+  }
+  const data = await res.json();
+
+  try {
+    const usage = data.usageMetadata || {};
+    const inputTokens = usage.promptTokenCount || 0;
+    const outputTokens = usage.candidatesTokenCount || 0;
+    const costUsd =
+      (inputTokens / 1_000_000) * GEMINI_PRICE.inputPerMillion +
+      (outputTokens / 1_000_000) * GEMINI_PRICE.outputPerMillion;
+
+    await supabase.from("ai_usage_logs").insert([{
+      feature,
+      user_id: userId,
+      recipe_id: recipeId,
+      model: GEMINI_PRICE.model,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_usd: Number(costUsd.toFixed(6)),
+    }]);
+  } catch (logErr) {
+    console.error("⚠️ AI 사용량 기록 실패 (기능 자체에는 영향 없음):", logErr.message);
+  }
+
+  return data;
+}
+
 const RECIPE_PROMPT = `## 절대 규칙 (가장 중요)
 - 인분(servings)은 영상에서 직접 확인된 경우만 숫자로, 아니면 반드시 '1회분'으로만 표시
 - 재료 수치는 아래 정보들 중에서 확인된 숫자만 사용할 것
@@ -310,24 +359,15 @@ function buildReferenceBlock(description, comments) {
   return descBlock + commentBlock;
 }
 
-async function analyzeVideoWithGemini(youtubeUrl, description = "", comments = "") {
+async function analyzeVideoWithGemini(youtubeUrl, description = "", comments = "", userId = null) {
   const referenceBlock = buildReferenceBlock(description, comments);
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { text: RECIPE_PROMPT + referenceBlock },
-        { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
-      ]}],
-      generationConfig: { temperature: 1 }
-    })
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
-  }
-  const data = await res.json();
+  const data = await callGeminiAndLog({
+    contents: [{ parts: [
+      { text: RECIPE_PROMPT + referenceBlock },
+      { fileData: { mimeType: "video/mp4", fileUri: youtubeUrl } }
+    ]}],
+    generationConfig: { temperature: 1 }
+  }, { feature: "extract_video_youtube", userId });
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const clean = text.replace(/```json|```/g, "").trim();
   if (!clean) throw new Error("Gemini 응답이 비어있어요.");
@@ -336,21 +376,12 @@ async function analyzeVideoWithGemini(youtubeUrl, description = "", comments = "
   return normalizeServings(result);
 }
 
-async function analyzeTranscriptWithGemini(transcript, description = "", comments = "") {
+async function analyzeTranscriptWithGemini(transcript, description = "", comments = "", userId = null) {
   const referenceBlock = buildReferenceBlock(description, comments);
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `${RECIPE_PROMPT}${referenceBlock}\n\n자막:\n${transcript.slice(0, 8000)}` }] }],
-      generationConfig: { temperature: 1 }
-    })
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
-  }
-  const data = await res.json();
+  const data = await callGeminiAndLog({
+    contents: [{ parts: [{ text: `${RECIPE_PROMPT}${referenceBlock}\n\n자막:\n${transcript.slice(0, 8000)}` }] }],
+    generationConfig: { temperature: 1 }
+  }, { feature: "extract_video_transcript_fallback", userId });
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const clean = text.replace(/```json|```/g, "").trim();
   if (!clean) throw new Error("Gemini 응답이 비어있어요.");
@@ -386,12 +417,12 @@ app.post("/api/extract", async (req, res) => {
 
   let recipes, method;
   try {
-    recipes = await analyzeVideoWithGemini(url, description, comments);
+    recipes = await analyzeVideoWithGemini(url, description, comments, user_id);
     method = "gemini_video";
   } catch (e) {
     try {
       const transcript = await getTranscriptSupadata(videoId);
-      recipes = await analyzeTranscriptWithGemini(transcript, description, comments);
+      recipes = await analyzeTranscriptWithGemini(transcript, description, comments, user_id);
       method = "transcript";
     } catch (e2) {
       return res.status(500).json({ error: "레시피 추출에 실패했어요: " + e2.message });
@@ -524,7 +555,7 @@ gelatin, vanilla_bean, instant_yeast, doubanjiang, oyster_sauce, mirin
 ]`;
 
 app.post("/api/recipes/parse-import", async (req, res) => {
-  const { text, imageBase64, mimeType, images } = req.body;
+  const { text, imageBase64, mimeType, images, user_id } = req.body;
 
   const imageList = Array.isArray(images) && images.length > 0
     ? images
@@ -543,15 +574,10 @@ app.post("/api/recipes/parse-import", async (req, res) => {
       parts.push({ inlineData: { mimeType: img.mimeType || "image/jpeg", data: img.imageBase64 } });
     });
 
-    const res2 = await fetch(GEMINI_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.2 } })
-    });
-    if (!res2.ok) {
-      const err = await res2.json();
-      throw new Error(JSON.stringify(err?.error?.message || err));
-    }
-    const data = await res2.json();
+    const data = await callGeminiAndLog(
+      { contents: [{ parts }], generationConfig: { temperature: 0.2 } },
+      { feature: "recipe_import_text_or_image", userId: user_id }
+    );
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const clean = responseText.replace(/```json|```/g, "").trim();
     if (!clean) throw new Error("Gemini 응답이 비어있어요.");
@@ -696,15 +722,10 @@ app.post("/api/recipes/parse-import-url", async (req, res) => {
 
   try {
     const prompt = `${WEBPAGE_IMPORT_PROMPT}\n\n원본 페이지 텍스트:\n${pageText.slice(0, 12000)}`;
-    const res2 = await fetch(GEMINI_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } })
-    });
-    if (!res2.ok) {
-      const err = await res2.json();
-      throw new Error(JSON.stringify(err?.error?.message || err));
-    }
-    const data = await res2.json();
+    const data = await callGeminiAndLog(
+      { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } },
+      { feature: "recipe_import_webpage", userId: user_id }
+    );
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const clean = responseText.replace(/```json|```/g, "").trim();
     if (!clean) throw new Error("Gemini 응답이 비어있어요.");
@@ -891,18 +912,10 @@ app.post("/api/recipes/:id/tool-alternative", async (req, res) => {
 재료: ${JSON.stringify(recipe.ingredients || [])}
 조리 과정: ${JSON.stringify(recipe.steps || [])}`;
 
-      const res2 = await fetch(GEMINI_URL, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4 }
-        })
-      });
-      if (!res2.ok) {
-        const err = await res2.json();
-        throw new Error(JSON.stringify(err?.error?.message || err));
-      }
-      const data = await res2.json();
+      const data = await callGeminiAndLog(
+        { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4 } },
+        { feature: itemKind === "ingredient" ? "tool_alternative_ingredient" : "tool_alternative_tool", userId: user_id, recipeId: id }
+      );
       alternative = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
       if (!alternative) throw new Error("Gemini 응답이 비어있어요.");
 
@@ -972,18 +985,10 @@ app.post("/api/recipes/:id/diet-coach", async (req, res) => {
 조리 과정: ${JSON.stringify(recipe.steps || [])}
 영양정보(추정): ${JSON.stringify(recipe.nutrition || {})}`;
 
-      const res2 = await fetch(GEMINI_URL, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4 }
-        })
-      });
-      if (!res2.ok) {
-        const err = await res2.json();
-        throw new Error(JSON.stringify(err?.error?.message || err));
-      }
-      const data = await res2.json();
+      const data = await callGeminiAndLog(
+        { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4 } },
+        { feature: "diet_coach", userId: user_id, recipeId: id }
+      );
       const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
       const clean = text.replace(/```json|```/g, "").trim();
       if (!clean) throw new Error("Gemini 응답이 비어있어요.");
@@ -1224,7 +1229,7 @@ app.post("/api/auth/kakao", async (req, res) => {
 // 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
 // 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
 app.post("/api/recipe-from-image", async (req, res) => {
-  const { imageBase64, mimeType, images } = req.body;
+  const { imageBase64, mimeType, images, user_id } = req.body;
 
   const imageList = Array.isArray(images) && images.length > 0
     ? images
@@ -1244,14 +1249,13 @@ app.post("/api/recipe-from-image", async (req, res) => {
       inlineData: { mimeType: img.mimeType || "image/jpeg", data: img.imageBase64 }
     }));
 
-    const res2 = await fetch(GEMINI_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const data = await callGeminiAndLog(
+      {
         contents: [{ parts: [{ text: imagePrompt }, ...imageParts] }],
         generationConfig: { temperature: 1 }
-      })
-    });
-    const data = await res2.json();
+      },
+      { feature: "recipe_from_image", userId: user_id }
+    );
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const clean = text.replace(/```json|```/g, "").trim();
     if (!clean) throw new Error("응답이 비어있어요.");
@@ -1291,21 +1295,16 @@ app.post("/api/recipe-from-video", async (req, res) => {
   }
 
   try {
-    const res2 = await fetch(GEMINI_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const data = await callGeminiAndLog(
+      {
         contents: [{ parts: [
           { text: RECIPE_PROMPT },
           { inlineData: { mimeType: mimeType || "video/mp4", data: videoBase64 } }
         ]}],
         generationConfig: { temperature: 1 }
-      })
-    });
-    if (!res2.ok) {
-      const err = await res2.json();
-      throw new Error(JSON.stringify(err?.error?.message || err));
-    }
-    const data = await res2.json();
+      },
+      { feature: "recipe_from_video_upload", userId: user_id }
+    );
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const clean = text.replace(/```json|```/g, "").trim();
     if (!clean) throw new Error("Gemini 응답이 비어있어요.");
@@ -1634,6 +1633,7 @@ app.put("/api/menu/:menuId/checklist", async (req, res) => {
 // ── 🤖 자유 형식 레시피 노트 → Gemini 실제 파싱 (프로토타입의 진짜 버전) ──
 app.post("/api/menu/parse-freeform", async (req, res) => {
   let text = req.body?.text;
+  const userIdForLog = req.body?.user_id || null;
   console.log("📥 parse-freeform 수신 타입:", typeof text, Array.isArray(text) ? `(배열, 길이 ${text.length})` : "");
   if (Array.isArray(text)) text = text.join("\n");
   if (typeof text !== "string") text = text ? JSON.stringify(text) : "";
@@ -1665,18 +1665,10 @@ app.post("/api/menu/parse-freeform", async (req, res) => {
 ${text.slice(0, 12000)}`;
 
   try {
-    const res2 = await fetch(GEMINI_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: PARSE_PROMPT }] }],
-        generationConfig: { temperature: 0.2 }
-      })
-    });
-    if (!res2.ok) {
-      const err = await res2.json();
-      throw new Error(JSON.stringify(err?.error?.message || err));
-    }
-    const data = await res2.json();
+    const data = await callGeminiAndLog(
+      { contents: [{ parts: [{ text: PARSE_PROMPT }] }], generationConfig: { temperature: 0.2 } },
+      { feature: "menu_freeform_parse", userId: userIdForLog }
+    );
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const clean = responseText.replace(/```json|```/g, "").trim();
     if (!clean) throw new Error("Gemini 응답이 비어있어요.");
