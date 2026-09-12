@@ -32,16 +32,40 @@ const GEMINI_PRICE = {
 // feature: 어떤 기능에서 호출했는지 구분용 문자열 (예: "extract_video_youtube")
 // userId/recipeId: 있으면 같이 기록 (없어도 됨)
 // 사용량 기록 자체가 실패해도 본 기능(레시피 추출 등)에는 절대 영향 주지 않음.
+// 잠깐 기다리는 헬퍼 (재시도 사이 대기용)
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 재시도할 가치가 있는 에러인지 판단 — 503(일시적 과부하), 429(요청 과다)는
+// "잠시 후 다시 시도해달라"는 뜻이라 재시도하면 성공할 가능성이 높음.
+// 400(잘못된 요청), 403(권한 없음) 같은 건 다시 시도해도 똑같이 실패하므로 재시도 안 함.
+function isRetryableStatus(status) {
+  return status === 503 || status === 429;
+}
+
 async function callGeminiAndLog(payload, { feature, userId = null, recipeId = null } = {}) {
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Gemini 오류: ${JSON.stringify(err?.error?.message || err)}`);
+  const MAX_RETRIES = 2;
+  const RETRY_DELAYS_MS = [2000, 5000]; // 1차 재시도 2초 대기, 2차 재시도 5초 대기
+
+  let res, lastErrBody;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    res = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) break;
+
+    lastErrBody = await res.json().catch(() => ({}));
+    const canRetry = isRetryableStatus(res.status) && attempt < MAX_RETRIES;
+    if (!canRetry) {
+      throw new Error(`Gemini 오류: ${JSON.stringify(lastErrBody?.error?.message || lastErrBody)}`);
+    }
+    console.error(`⚠️ Gemini 일시적 과부하(${res.status}), ${RETRY_DELAYS_MS[attempt] / 1000}초 후 재시도 (${attempt + 1}/${MAX_RETRIES})`);
+    await sleep(RETRY_DELAYS_MS[attempt]);
   }
+
   const data = await res.json();
 
   try {
