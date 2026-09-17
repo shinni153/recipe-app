@@ -1192,8 +1192,40 @@ async function saveKakaoMapping(kakaoId, supabaseUserId) {
   if (error) throw error;
 }
 
+// ── 웹 카카오 로그인: 인가코드(code)를 accessToken으로 교환 ──────────
+// [2026-09-17 추가] 카카오 JS SDK가 팝업 로그인(Kakao.Auth.login)을 지원 안 하게 되면서,
+// 웹에서는 Kakao.Auth.authorize()로 페이지 이동 방식만 써야 함. 이 경우 돌아올 때
+// accessToken이 아니라 "인가코드(code)"만 받아오므로, 서버가 그 코드를 다시 카카오
+// 서버에 보내서 accessToken으로 교환해줘야 함. (REST API 키가 필요해서 서버에서 처리)
+async function exchangeKakaoCodeForToken(code, redirectUri) {
+  const params = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: process.env.KAKAO_REST_API_KEY,
+    redirect_uri: redirectUri,
+    code,
+  });
+  const res = await fetch("https://kauth.kakao.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
+    body: params.toString(),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.access_token) {
+    throw new Error(data.error_description || "인가코드를 토큰으로 교환하지 못했어요.");
+  }
+  return data.access_token;
+}
+
 app.post("/api/auth/kakao", async (req, res) => {
-  const { accessToken } = req.body;
+  let { accessToken, code, redirectUri } = req.body;
+  // 웹에서 온 요청(code만 있고 accessToken은 없음)이면 먼저 토큰으로 교환
+  if (!accessToken && code) {
+    try {
+      accessToken = await exchangeKakaoCodeForToken(code, redirectUri);
+    } catch (e) {
+      return res.status(401).json({ error: "카카오 인가코드 교환 실패: " + e.message });
+    }
+  }
   if (!accessToken) return res.status(400).json({ error: "카카오 토큰이 없어요." });
 
   try {
