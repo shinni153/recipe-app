@@ -1204,6 +1204,10 @@ async function exchangeKakaoCodeForToken(code, redirectUri) {
     redirect_uri: redirectUri,
     code,
   });
+  // 클라이언트 시크릿이 활성화되어 있으면 반드시 같이 보내야 함 (안 보내면 "Bad client credentials" 에러)
+  if (process.env.KAKAO_CLIENT_SECRET) {
+    params.set("client_secret", process.env.KAKAO_CLIENT_SECRET);
+  }
   const res = await fetch("https://kauth.kakao.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
