@@ -1288,6 +1288,118 @@ app.post("/api/auth/kakao", async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   🟢 네이버 로그인 (2026-09-19 추가) — 카카오 로그인과 완전히 같은 패턴.
+   naver_user_map 테이블(naver_id -> supabase_user_id)로 매핑.
+   근처 식당 검색과 같은 네이버 애플리케이션(NAVER_CLIENT_ID/SECRET)을 그대로 씀.
+   ══════════════════════════════════════════════════════════════════ */
+function deriveNaverPassword(naverUserId) {
+  return crypto
+    .createHmac("sha256", SUPABASE_SECRET_KEY + ":naver-auth")
+    .update(String(naverUserId))
+    .digest("hex");
+}
+
+async function findNaverMapping(naverId) {
+  const { data, error } = await supabase
+    .from("naver_user_map")
+    .select("supabase_user_id")
+    .eq("naver_id", String(naverId))
+    .maybeSingle();
+  if (error) throw error;
+  return data?.supabase_user_id || null;
+}
+
+async function saveNaverMapping(naverId, supabaseUserId) {
+  const { error } = await supabase
+    .from("naver_user_map")
+    .insert([{ naver_id: String(naverId), supabase_user_id: supabaseUserId }]);
+  if (error) throw error;
+}
+
+// ── 웹 네이버 로그인: 인가코드(code)를 accessToken으로 교환 ──────────
+async function exchangeNaverCodeForToken(code, state) {
+  const params = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: process.env.NAVER_CLIENT_ID,
+    client_secret: process.env.NAVER_CLIENT_SECRET,
+    code,
+  });
+  if (state) params.set("state", state);
+  const res = await fetch(`https://nid.naver.com/oauth2.0/token?${params.toString()}`);
+  const data = await res.json();
+  if (!data.access_token) throw new Error(data.error_description || "토큰 교환 실패");
+  return data.access_token;
+}
+
+app.post("/api/auth/naver", async (req, res) => {
+  let { accessToken, code, state } = req.body;
+  if (!process.env.NAVER_CLIENT_ID || !process.env.NAVER_CLIENT_SECRET) {
+    return res.status(501).json({ error: "네이버 로그인이 아직 설정되지 않았어요." });
+  }
+  if (!accessToken && code) {
+    try {
+      accessToken = await exchangeNaverCodeForToken(code, state);
+    } catch (e) {
+      return res.status(401).json({ error: "네이버 인가코드 교환 실패: " + e.message });
+    }
+  }
+  if (!accessToken) return res.status(400).json({ error: "네이버 토큰이 없어요." });
+
+  try {
+    // 1) 네이버 서버에 토큰 검증 + 사용자 정보 요청
+    const naverRes = await fetch("https://openapi.naver.com/v1/nid/me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const naverData = await naverRes.json();
+    if (naverData.resultcode !== "00" || !naverData.response) {
+      return res.status(401).json({ error: "유효하지 않은 네이버 토큰이에요." });
+    }
+    const naverId = naverData.response.id;
+    const naverEmail = naverData.response.email;
+    const nickname = naverData.response.nickname || naverData.response.name || null;
+
+    const password = deriveNaverPassword(naverId);
+
+    // 2) 매핑 테이블에서 네이버ID로 바로 조회
+    let supabaseUserId = await findNaverMapping(naverId);
+    let email;
+
+    if (supabaseUserId) {
+      const { data: userData, error: getErr } = await supabase.auth.admin.getUserById(supabaseUserId);
+      if (getErr || !userData?.user) throw getErr || new Error("매핑된 유저를 찾을 수 없어요.");
+      email = userData.user.email;
+      await supabase.auth.admin.updateUserById(supabaseUserId, { password });
+    } else {
+      email = naverEmail || `naver_${naverId}@recipex.internal`;
+
+      const { data: userList, error: listErr } = await supabase.auth.admin.listUsers();
+      if (listErr) throw listErr;
+      const legacy = userList?.users?.find(u => u.email === email);
+
+      if (legacy) {
+        supabaseUserId = legacy.id;
+        await supabase.auth.admin.updateUserById(supabaseUserId, { password });
+      } else {
+        const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { provider: "naver", naver_id: naverId, nickname },
+        });
+        if (createErr) throw createErr;
+        supabaseUserId = created.user.id;
+      }
+
+      await saveNaverMapping(naverId, supabaseUserId);
+    }
+
+    res.json({ email, hashedPassword: password });
+  } catch (e) {
+    res.status(500).json({ error: "네이버 로그인 처리 실패: " + e.message });
+  }
+});
+
 // ── 사진으로 레시피 추론 (여러 장 지원) ─────────────────────────
 // 기존 { imageBase64, mimeType } 단일 방식도 그대로 지원(하위호환),
 // 새로운 { images: [{imageBase64, mimeType}, ...] } 배열 방식도 지원.
@@ -1872,6 +1984,51 @@ app.post("/api/revenuecat-webhook", async (req, res) => {
   } catch (e) {
     // 500을 반환하면 RevenueCat이 자동으로 재시도하므로, 진짜 실패했을 때만 500
     res.status(500).json({ error: "토큰 지급 실패: " + e.message });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   🍜 "오늘 뭐 먹지?" 외식 매치 — 근처 식당 검색 (2026-09-19 추가)
+   네이버 지역검색 API 프록시. Client ID/Secret은 클라이언트에 노출하면
+   안 되는 값이라 서버를 거침. Render 환경변수(NAVER_CLIENT_ID,
+   NAVER_CLIENT_SECRET) 등록 전까지는 501로 "아직 설정 안 됨"을 응답하고,
+   앱은 이 경우 네이버지도 앱 검색 딥링크로 대체 동작함.
+   ══════════════════════════════════════════════════════════════════ */
+app.post("/api/nearby-restaurants", async (req, res) => {
+  const { query, areaHint } = req.body || {};
+  if (!query) return res.status(400).json({ error: "검색어(query)가 필요해요." });
+
+  const clientId = process.env.NAVER_CLIENT_ID;
+  const clientSecret = process.env.NAVER_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return res.status(501).json({ error: "네이버 지역검색 API 키가 아직 설정되지 않았어요.", not_configured: true });
+  }
+
+  try {
+    const q = areaHint ? `${areaHint} ${query}` : query;
+    const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(q)}&display=5&sort=comment`;
+    const naverRes = await fetch(url, {
+      headers: {
+        "X-Naver-Client-Id": clientId,
+        "X-Naver-Client-Secret": clientSecret,
+      },
+    });
+    if (!naverRes.ok) throw new Error(`네이버 API 응답 오류 (${naverRes.status})`);
+    const data = await naverRes.json();
+
+    // mapx/mapy는 WGS84 좌표에 10^7을 곱한 정수값으로 내려옴 -> 나눠서 위경도로 변환
+    // (⚠️ 실키 발급 후 실제 응답으로 꼭 재검증할 것 — 문서 기준으로 작성함)
+    const places = (data.items || []).map(item => ({
+      name: item.title.replace(/<\/?b>/g, ""),
+      address: item.roadAddress || item.address,
+      category: item.category,
+      lat: Number(item.mapy) / 1e7,
+      lng: Number(item.mapx) / 1e7,
+      link: item.link || null,
+    }));
+    res.json({ places });
+  } catch (e) {
+    res.status(500).json({ error: "근처 식당 검색 실패: " + e.message });
   }
 });
 
