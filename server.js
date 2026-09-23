@@ -1130,8 +1130,10 @@ app.put("/api/pantry", async (req, res) => {
 app.get("/api/history", async (req, res) => {
   const { user_id } = req.query;
   try {
+    // "레시피 가져오기"의 "최근 분석" 섹션에서 탭하면 바로 상세화면으로 들어가야 해서
+    // 필요한 필드만 고르지 않고 전체 행을 내려줌 (레시피 상세 화면이 기대하는 형태 그대로)
     const { data, error } = await supabase.from("recipes")
-      .select("id, title, thumbnail_url, source_url, created_at").eq("user_id", user_id)
+      .select("*").eq("user_id", user_id)
       .order("created_at", { ascending: false }).limit(5);
     if (error) throw error;
     const history = (data || []).map(r => ({ ...r, time_ago: timeAgo(r.created_at) }));
