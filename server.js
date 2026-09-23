@@ -1291,7 +1291,10 @@ app.post("/api/auth/kakao", async (req, res) => {
 /* ══════════════════════════════════════════════════════════════════
    🟢 네이버 로그인 (2026-09-19 추가) — 카카오 로그인과 완전히 같은 패턴.
    naver_user_map 테이블(naver_id -> supabase_user_id)로 매핑.
-   근처 식당 검색과 같은 네이버 애플리케이션(NAVER_CLIENT_ID/SECRET)을 그대로 씀.
+   NAVER_CLIENT_ID/SECRET은 이 로그인 전용 네이버 애플리케이션("레시피X") 키.
+   ⚠️ 근처 식당 검색(NAVER_SEARCH_CLIENT_ID/SECRET)은 NAVER API HUB에서
+   따로 등록한 별도 앱이라 값이 다름 (2026-09-24 확인, 처음엔 같은 앱일
+   거라 잘못 가정했었음).
    ══════════════════════════════════════════════════════════════════ */
 function deriveNaverPassword(naverUserId) {
   return crypto
@@ -1990,16 +1993,19 @@ app.post("/api/revenuecat-webhook", async (req, res) => {
 /* ══════════════════════════════════════════════════════════════════
    🍜 "오늘 뭐 먹지?" 외식 매치 — 근처 식당 검색 (2026-09-19 추가)
    네이버 지역검색 API 프록시. Client ID/Secret은 클라이언트에 노출하면
-   안 되는 값이라 서버를 거침. Render 환경변수(NAVER_CLIENT_ID,
-   NAVER_CLIENT_SECRET) 등록 전까지는 501로 "아직 설정 안 됨"을 응답하고,
+   안 되는 값이라 서버를 거침. Render 환경변수(NAVER_SEARCH_CLIENT_ID,
+   NAVER_SEARCH_CLIENT_SECRET) 등록 전까지는 501로 "아직 설정 안 됨"을 응답하고,
    앱은 이 경우 네이버지도 앱 검색 딥링크로 대체 동작함.
+   ⚠️ 로그인용 NAVER_CLIENT_ID/SECRET과는 다른 별도 네이버 애플리케이션임
+   (NAVER API HUB에서 "지역" API로 따로 등록함, 2026-09-24) — 절대 헷갈려서
+   같은 값으로 합치지 말 것.
    ══════════════════════════════════════════════════════════════════ */
 app.post("/api/nearby-restaurants", async (req, res) => {
   const { query, areaHint } = req.body || {};
   if (!query) return res.status(400).json({ error: "검색어(query)가 필요해요." });
 
-  const clientId = process.env.NAVER_CLIENT_ID;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET;
+  const clientId = process.env.NAVER_SEARCH_CLIENT_ID;
+  const clientSecret = process.env.NAVER_SEARCH_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     return res.status(501).json({ error: "네이버 지역검색 API 키가 아직 설정되지 않았어요.", not_configured: true });
   }
