@@ -1999,6 +1999,10 @@ app.post("/api/revenuecat-webhook", async (req, res) => {
    ⚠️ 로그인용 NAVER_CLIENT_ID/SECRET과는 다른 별도 네이버 애플리케이션임
    (NAVER API HUB에서 "지역" API로 따로 등록함, 2026-09-24) — 절대 헷갈려서
    같은 값으로 합치지 말 것.
+   ⚠️ 네이버 개발자센터(developers.naver.com)가 2026-07-31부로 검색 API
+   신규 발급을 끊어서, NAVER API HUB(NCP APIGW 경유)로 새로 발급받음.
+   호스트/인증 헤더가 예전 openapi.naver.com 방식과 다름
+   (X-Naver-Client-Id 아님, X-NCP-APIGW-API-KEY-ID 방식).
    ══════════════════════════════════════════════════════════════════ */
 app.post("/api/nearby-restaurants", async (req, res) => {
   const { query, areaHint } = req.body || {};
@@ -2012,11 +2016,11 @@ app.post("/api/nearby-restaurants", async (req, res) => {
 
   try {
     const q = areaHint ? `${areaHint} ${query}` : query;
-    const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(q)}&display=5&sort=comment`;
+    const url = `https://naverapihub.apigw.ntruss.com/search/v1/local?query=${encodeURIComponent(q)}&display=5&sort=comment`;
     const naverRes = await fetch(url, {
       headers: {
-        "X-Naver-Client-Id": clientId,
-        "X-Naver-Client-Secret": clientSecret,
+        "X-NCP-APIGW-API-KEY-ID": clientId,
+        "X-NCP-APIGW-API-KEY": clientSecret,
       },
     });
     if (!naverRes.ok) throw new Error(`네이버 API 응답 오류 (${naverRes.status})`);
