@@ -2049,4 +2049,147 @@ app.post("/api/nearby-restaurants", async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   🖼️ 관리자 전용: "오늘 뭐 먹지" 메뉴 이미지 일괄 생성 (Gemini Batch API)
+   1회성 백필 작업. x-admin-secret 헤더로만 접근 가능.
+   ══════════════════════════════════════════════════════════════════ */
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+function requireAdmin(req, res) {
+  if (!ADMIN_SECRET || req.headers["x-admin-secret"] !== ADMIN_SECRET) {
+    res.status(403).json({ error: "권한 없음" });
+    return false;
+  }
+  return true;
+}
+
+function buildMenuImagePrompt(m) {
+  return `"${m.name}"(이)라는 ${m.category} 음식의 전문 푸드 포토그래피 사진을 만들어줘. ` +
+    `접시에 먹음직스럽게 플레이팅된 모습, 자연광, 심플하고 깔끔한 배경, 사실적인 사진 스타일. ` +
+    `텍스트나 워터마크, 로고는 절대 넣지 마.`;
+}
+
+// Gemini File API — resumable upload 2단계 (JSONL 배치 입력 파일용)
+async function uploadBatchInputFile(jsonlContent, displayName) {
+  const bytes = Buffer.byteLength(jsonlContent, "utf8");
+  const startRes = await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files", {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": GEMINI_API_KEY,
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(bytes),
+      "X-Goog-Upload-Header-Content-Type": "jsonl",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file: { display_name: displayName } }),
+  });
+  const uploadUrl = startRes.headers.get("x-goog-upload-url");
+  if (!uploadUrl) throw new Error("업로드 URL을 못 받음: " + (await startRes.text()));
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Length": String(bytes),
+      "X-Goog-Upload-Offset": "0",
+      "X-Goog-Upload-Command": "upload, finalize",
+    },
+    body: jsonlContent,
+  });
+  const fileData = await uploadRes.json();
+  if (!fileData.file?.name) throw new Error("파일 업로드 실패: " + JSON.stringify(fileData));
+  return fileData.file.name; // "files/abc123"
+}
+
+// 1단계: image_url이 비어있는 메뉴 전부 모아서 배치 작업 제출
+app.post("/api/admin/menu-images/start", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const { data: menus, error } = await supabase
+      .from("today_eat_menus")
+      .select("id, name, category, type")
+      .is("image_url", null);
+    if (error) throw error;
+    if (!menus || menus.length === 0) return res.json({ message: "채울 항목이 없어요.", count: 0 });
+
+    const lines = menus.map(m => JSON.stringify({
+      key: m.id,
+      request: {
+        contents: [{ parts: [{ text: buildMenuImagePrompt(m) }] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+      },
+    }));
+    const displayName = `menu-images-${Date.now()}`;
+    const fileName = await uploadBatchInputFile(lines.join("\n"), displayName);
+
+    const batchRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:batchGenerateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batch: { display_name: displayName, input_config: { file_name: fileName } },
+        }),
+      }
+    );
+    const batchData = await batchRes.json();
+    if (!batchData.name) throw new Error("배치 작업 생성 실패: " + JSON.stringify(batchData));
+    res.json({ batchName: batchData.name, count: menus.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 2단계: 배치 작업 상태 확인, 끝났으면 결과 이미지를 Storage에 올리고 image_url 채움
+app.get("/api/admin/menu-images/status", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const jobName = req.query.job;
+  if (!jobName) return res.status(400).json({ error: "job 파라미터가 필요해요." });
+  try {
+    const jobRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${jobName}?key=${GEMINI_API_KEY}`);
+    const jobData = await jobRes.json();
+    const state = jobData.metadata?.state || jobData.state;
+    if (!jobData.done) {
+      return res.json({ state, done: false });
+    }
+    if (jobData.error) {
+      return res.status(500).json({ state, done: true, error: jobData.error });
+    }
+
+    const responsesFileName = jobData.response?.responsesFile;
+    if (!responsesFileName) return res.status(500).json({ error: "결과 파일을 못 찾음: " + JSON.stringify(jobData) });
+
+    const dlRes = await fetch(`https://generativelanguage.googleapis.com/download/v1beta/${responsesFileName}:download?alt=media&key=${GEMINI_API_KEY}`);
+    const jsonlText = await dlRes.text();
+    const lines = jsonlText.trim().split("\n").filter(Boolean);
+
+    let saved = 0, failed = 0;
+    for (const line of lines) {
+      let entry;
+      try { entry = JSON.parse(line); } catch { failed++; continue; }
+      const menuId = entry.key;
+      try {
+        const parts = entry.response?.candidates?.[0]?.content?.parts || [];
+        const imagePart = parts.find(p => p.inlineData);
+        if (!imagePart) { failed++; continue; }
+        const { mimeType, data } = imagePart.inlineData;
+        const ext = mimeType.includes("png") ? "png" : "jpg";
+        const buffer = Buffer.from(data, "base64");
+        const path = `${menuId}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("menu-images").upload(path, buffer, {
+          contentType: mimeType, upsert: true,
+        });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("menu-images").getPublicUrl(path);
+        await supabase.from("today_eat_menus").update({ image_url: pub.publicUrl }).eq("id", menuId);
+        saved++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    res.json({ state, done: true, saved, failed, total: lines.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(3000, () => console.log("✅ 서버 실행 중: http://localhost:3000"));
