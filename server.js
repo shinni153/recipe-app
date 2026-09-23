@@ -2103,6 +2103,20 @@ async function uploadBatchInputFile(jsonlContent, displayName) {
   console.log("[menu-images] 2단계 응답 status=", uploadRes.status);
   const fileData = await uploadRes.json();
   if (!fileData.file?.name) throw new Error("파일 업로드 실패: " + JSON.stringify(fileData));
+  console.log("[menu-images] 업로드된 파일:", JSON.stringify(fileData.file));
+
+  // 파일이 ACTIVE 상태가 될 때까지 잠깐 기다림 (PROCESSING 상태에서 바로 배치에 쓰면 실패할 수 있음)
+  let state = fileData.file.state;
+  let tries = 0;
+  while (state && state !== "ACTIVE" && tries < 10) {
+    await new Promise(r => setTimeout(r, 2000));
+    const checkRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileData.file.name}?key=${GEMINI_API_KEY}`);
+    const checkData = await checkRes.json();
+    state = checkData.state;
+    tries++;
+    console.log("[menu-images] 파일 상태 확인", tries, state);
+  }
+
   return fileData.file.name; // "files/abc123"
 }
 
