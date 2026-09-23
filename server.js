@@ -2089,7 +2089,8 @@ async function uploadBatchInputFile(jsonlContent, displayName) {
   const uploadRes = await fetch(uploadUrl, {
     method: "POST",
     headers: {
-      "Content-Length": String(bytes),
+      // Content-Length는 fetch(undici)가 body로부터 자동 계산함 — 수동 설정하면
+      // "invalid content-length header"로 fetch 자체가 실패함
       "X-Goog-Upload-Offset": "0",
       "X-Goog-Upload-Command": "upload, finalize",
     },
