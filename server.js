@@ -2071,7 +2071,6 @@ function buildMenuImagePrompt(m) {
 // Gemini File API — resumable upload 2단계 (JSONL 배치 입력 파일용)
 async function uploadBatchInputFile(jsonlContent, displayName) {
   const bytes = Buffer.byteLength(jsonlContent, "utf8");
-  console.log("[menu-images] 1단계 시작, bytes=", bytes);
   const startRes = await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files", {
     method: "POST",
     headers: {
@@ -2084,12 +2083,9 @@ async function uploadBatchInputFile(jsonlContent, displayName) {
     },
     body: JSON.stringify({ file: { display_name: displayName } }),
   });
-  console.log("[menu-images] 1단계 응답 status=", startRes.status);
   const uploadUrl = startRes.headers.get("x-goog-upload-url");
-  console.log("[menu-images] uploadUrl=", uploadUrl);
   if (!uploadUrl) throw new Error("업로드 URL을 못 받음: " + (await startRes.text()));
 
-  console.log("[menu-images] 2단계 시작");
   const uploadRes = await fetch(uploadUrl, {
     method: "POST",
     headers: {
@@ -2100,10 +2096,8 @@ async function uploadBatchInputFile(jsonlContent, displayName) {
     },
     body: jsonlContent,
   });
-  console.log("[menu-images] 2단계 응답 status=", uploadRes.status);
   const fileData = await uploadRes.json();
   if (!fileData.file?.name) throw new Error("파일 업로드 실패: " + JSON.stringify(fileData));
-  console.log("[menu-images] 업로드된 파일:", JSON.stringify(fileData.file));
 
   // 파일이 ACTIVE 상태가 될 때까지 잠깐 기다림 (PROCESSING 상태에서 바로 배치에 쓰면 실패할 수 있음)
   let state = fileData.file.state;
