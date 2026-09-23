@@ -2135,7 +2135,8 @@ app.post("/api/admin/menu-images/start", async (req, res) => {
     if (!batchData.name) throw new Error("배치 작업 생성 실패: " + JSON.stringify(batchData));
     res.json({ batchName: batchData.name, count: menus.length });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error("menu-images/start 실패:", e);
+    res.status(500).json({ error: e.message, cause: e.cause ? String(e.cause) : undefined });
   }
 });
 
