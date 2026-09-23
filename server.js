@@ -516,7 +516,7 @@ app.post("/api/tokens/watch-ad", async (req, res) => {
 });
 
 app.post("/api/save-recipe", async (req, res) => {
-  const { recipe, category, source_url, thumbnail_url, user_id, source_type } = req.body;
+  const { recipe, category, source_url, thumbnail_url, user_id, source_type, import_method } = req.body;
   if (!recipe) return res.status(400).json({ error: "레시피가 없어요." });
   if (!user_id) return res.status(400).json({ error: "로그인 정보가 없어요." });
   try {
@@ -526,7 +526,8 @@ app.post("/api/save-recipe", async (req, res) => {
       nutrition: recipe.nutrition, source_url: source_url || "", thumbnail_url: thumbnail_url || "",
       required_tools: recipe.required_tools || [], required_tools_freetext: recipe.required_tools_freetext || null,
       required_ingredients_special: recipe.required_ingredients_special || [], required_ingredients_freetext: recipe.required_ingredients_freetext || null,
-      source_type: source_type === "manual" ? "manual" : "extracted"
+      source_type: source_type === "manual" ? "manual" : "extracted",
+      import_method: import_method || null
     }]).select();
     if (error) throw error;
     res.json({ success: true, data });
@@ -1130,11 +1131,12 @@ app.put("/api/pantry", async (req, res) => {
 app.get("/api/history", async (req, res) => {
   const { user_id } = req.query;
   try {
-    // "레시피 가져오기"의 "최근 분석" 섹션에서 탭하면 바로 상세화면으로 들어가야 해서
-    // 필요한 필드만 고르지 않고 전체 행을 내려줌 (레시피 상세 화면이 기대하는 형태 그대로)
+    // "레시피 가져오기"의 방법별(유튜브/블로그/사진·동영상/직접입력) "최근 분석" 섹션에서
+    // 클라이언트가 import_method로 나눠서 보여주므로, 넉넉히 가져와야 각 섹션이 덜 빔.
+    // 탭하면 바로 상세화면으로 들어가야 해서 필요한 필드만 고르지 않고 전체 행을 내려줌.
     const { data, error } = await supabase.from("recipes")
       .select("*").eq("user_id", user_id)
-      .order("created_at", { ascending: false }).limit(5);
+      .order("created_at", { ascending: false }).limit(30);
     if (error) throw error;
     const history = (data || []).map(r => ({ ...r, time_ago: timeAgo(r.created_at) }));
     res.json({ history });
