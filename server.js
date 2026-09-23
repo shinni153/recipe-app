@@ -1321,7 +1321,9 @@ async function saveNaverMapping(naverId, supabaseUserId) {
 }
 
 // ── 웹 네이버 로그인: 인가코드(code)를 accessToken으로 교환 ──────────
-async function exchangeNaverCodeForToken(code, state) {
+// redirect_uri를 안 보내면 일부 환경에서 발급이 조용히 실패하는 걸 봐서
+// (카카오 쪽 exchangeKakaoCodeForToken과 동일하게) 명시적으로 같이 보냄.
+async function exchangeNaverCodeForToken(code, state, redirectUri) {
   const params = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: process.env.NAVER_CLIENT_ID,
@@ -1329,6 +1331,7 @@ async function exchangeNaverCodeForToken(code, state) {
     code,
   });
   if (state) params.set("state", state);
+  if (redirectUri) params.set("redirect_uri", redirectUri);
   const res = await fetch(`https://nid.naver.com/oauth2.0/token?${params.toString()}`);
   const data = await res.json();
   if (!data.access_token) throw new Error(data.error_description || "토큰 교환 실패");
@@ -1336,13 +1339,13 @@ async function exchangeNaverCodeForToken(code, state) {
 }
 
 app.post("/api/auth/naver", async (req, res) => {
-  let { accessToken, code, state } = req.body;
+  let { accessToken, code, state, redirectUri } = req.body;
   if (!process.env.NAVER_CLIENT_ID || !process.env.NAVER_CLIENT_SECRET) {
     return res.status(501).json({ error: "네이버 로그인이 아직 설정되지 않았어요." });
   }
   if (!accessToken && code) {
     try {
-      accessToken = await exchangeNaverCodeForToken(code, state);
+      accessToken = await exchangeNaverCodeForToken(code, state, redirectUri);
     } catch (e) {
       return res.status(401).json({ error: "네이버 인가코드 교환 실패: " + e.message });
     }
